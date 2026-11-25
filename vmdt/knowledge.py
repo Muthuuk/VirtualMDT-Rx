@@ -186,6 +186,10 @@ INTERACTIONS = [
      "title": "Anti-inflammatory with lithium",
      "detail": "Can raise lithium to toxic levels. Avoid, or monitor lithium closely under specialist advice.",
      "source": "BNF interactions (paraphrased)"},
+    {"id": "PH-INT-014", "a": "cls:opioid", "b": "cls:benzodiazepine", "level": "AMBER",
+     "title": "Opioid with a benzodiazepine",
+     "detail": "Together they can cause deep drowsiness and dangerously slowed breathing. Prescribe together only if there is no alternative, at the lowest doses, and warn the patient and carers.",
+     "source": "MHRA drug safety advice (paraphrased)"},
     {"id": "PH-INT-013", "a": "cls:sulfonylurea", "b": "cls:insulin", "level": "AMBER",
      "title": "Two medicines that can cause low blood sugar",
      "detail": "Sulfonylurea with insulin increases the risk of hypoglycaemia. Review doses and glucose monitoring.",
@@ -361,3 +365,112 @@ TRIAGE_PHRASES = {
     "sick_day": ["vomiting", "not eating", "dehydrated", "diarrhoea"],
 }
 NEGATIONS = ["no ", "not ", "denies ", "without ", "nil "]
+
+# --------------------------------------------------------------------------
+# Side effects (illustrative, paraphrased from general product information).
+# NOT a complete list for any medicine. A clinical version must load the full
+# side-effect data from a licensed, maintained source (for example the BNF or
+# each product's SmPC) instead of this table.
+# --------------------------------------------------------------------------
+EFFECT_LABEL = {
+    "sedation": "drowsiness", "confusion": "confusion", "constipation": "constipation", "diarrhoea": "diarrhoea",
+    "nausea": "feeling or being sick", "low_bp": "low blood pressure or dizziness", "bleeding": "bleeding",
+    "gi_bleed": "stomach irritation or bleeding", "high_k": "high potassium", "low_k": "low potassium",
+    "low_na": "low sodium", "kidney": "strain on the kidneys", "hypo": "low blood sugar", "hyper": "raised blood sugar",
+    "qt": "heart rhythm changes (long QT)", "serotonin": "serotonin syndrome", "fluid": "fluid retention",
+    "bone": "bone thinning", "retention": "difficulty passing urine", "dry_mouth": "dry mouth",
+    "counts": "low blood counts", "liver": "liver problems", "rash": "rash", "uti": "urine or genital infections",
+    "dehydration": "dehydration", "clots": "blood clots", "weight_gain": "weight gain", "muscle": "muscle aches",
+    "slow_pulse": "slow pulse", "mouth_ulcers": "mouth ulcers", "tendon": "tendon damage", "hot_flush": "hot flushes",
+    "joint": "joint pain", "headache": "headache", "cough": "dry cough", "tremor": "tremor", "swelling": "ankle swelling",
+    "breathing": "slowed breathing", "masks_hypo": "can hide the warning signs of low blood sugar",
+    "lung": "lung problems (rare, mainly long courses)", "nerve": "nerve tingling (rare)", "b12": "low vitamin B12 with long use",
+    "ketoacidosis": "ketoacidosis (rare)", "pancreatitis": "inflamed pancreas (rare)", "fracture": "fractures",
+    "mood": "mood or sleep changes", "infection": "higher risk of infection", "movement": "movement disorders",
+    "seizure": "fits", "thrush": "thrush", "hand_foot": "sore hands and feet", "womb": "changes to the womb lining",
+    "blurred": "blurred vision", "thyroid": "thyroid changes", "gullet": "gullet irritation", "bloating": "bloating or wind",
+    "raised_bp": "raised blood pressure", "taste": "taste changes", "thirst": "thirst and passing more urine",
+}
+
+SIDE_EFFECTS = {
+    "nitrofurantoin": ["nausea", "headache", "lung", "liver", "nerve"],
+    "trimethoprim": ["nausea", "rash", "high_k", "counts"],
+    "pivmecillinam": ["nausea", "diarrhoea", "thrush", "rash"],
+    "fosfomycin": ["diarrhoea", "nausea", "headache"],
+    "cefalexin": ["diarrhoea", "nausea", "rash"],
+    "amoxicillin": ["diarrhoea", "nausea", "rash"],
+    "co-amoxiclav": ["diarrhoea", "nausea", "rash", "liver", "thrush"],
+    "ciprofloxacin": ["nausea", "diarrhoea", "tendon", "qt", "confusion", "seizure"],
+    "co-trimoxazole": ["nausea", "rash", "high_k", "counts"],
+    "clarithromycin": ["nausea", "diarrhoea", "taste", "qt"],
+    "metformin": ["nausea", "diarrhoea", "b12"],
+    "gliclazide": ["hypo", "weight_gain"],
+    "glibenclamide": ["hypo", "weight_gain"],
+    "dapagliflozin": ["uti", "thrush", "dehydration", "low_bp", "ketoacidosis"],
+    "empagliflozin": ["uti", "thrush", "dehydration", "low_bp", "ketoacidosis"],
+    "sitagliptin": ["headache", "pancreatitis"],
+    "linagliptin": ["cough", "pancreatitis"],
+    "pioglitazone": ["fluid", "weight_gain", "fracture"],
+    "insulin glargine": ["hypo", "weight_gain"],
+    "semaglutide": ["nausea", "diarrhoea", "constipation", "pancreatitis"],
+    "tamoxifen": ["hot_flush", "clots", "womb", "nausea"],
+    "letrozole": ["hot_flush", "joint", "bone"],
+    "anastrozole": ["hot_flush", "joint", "bone"],
+    "methotrexate": ["nausea", "mouth_ulcers", "counts", "liver", "lung"],
+    "capecitabine": ["diarrhoea", "hand_foot", "nausea", "counts", "mouth_ulcers"],
+    "morphine": ["constipation", "sedation", "nausea", "confusion", "breathing", "retention"],
+    "oxycodone": ["constipation", "sedation", "nausea", "confusion", "breathing"],
+    "ondansetron": ["constipation", "headache", "qt"],
+    "dexamethasone": ["hyper", "gi_bleed", "mood", "infection", "fluid", "bone"],
+    "prednisolone": ["hyper", "gi_bleed", "mood", "infection", "fluid", "bone"],
+    "metoclopramide": ["sedation", "movement", "diarrhoea"],
+    "warfarin": ["bleeding"],
+    "apixaban": ["bleeding"],
+    "ramipril": ["cough", "low_bp", "high_k", "kidney"],
+    "lisinopril": ["cough", "low_bp", "high_k", "kidney"],
+    "losartan": ["low_bp", "high_k", "kidney"],
+    "spironolactone": ["high_k", "low_bp", "kidney"],
+    "furosemide": ["dehydration", "low_bp", "low_k", "kidney"],
+    "bendroflumethiazide": ["low_na", "low_k", "low_bp", "hyper"],
+    "ibuprofen": ["gi_bleed", "kidney", "fluid", "raised_bp"],
+    "naproxen": ["gi_bleed", "kidney", "fluid", "raised_bp"],
+    "simvastatin": ["muscle", "liver"],
+    "atorvastatin": ["muscle", "liver"],
+    "paroxetine": ["nausea", "low_na", "bleeding", "sedation", "serotonin"],
+    "fluoxetine": ["nausea", "low_na", "bleeding", "mood", "serotonin"],
+    "sertraline": ["nausea", "diarrhoea", "low_na", "bleeding", "serotonin"],
+    "citalopram": ["nausea", "low_na", "bleeding", "qt", "serotonin"],
+    "tramadol": ["sedation", "constipation", "nausea", "confusion", "seizure", "serotonin"],
+    "oxybutynin": ["dry_mouth", "constipation", "confusion", "blurred", "retention"],
+    "diazepam": ["sedation", "confusion"],
+    "lithium": ["tremor", "thirst", "kidney", "thyroid"],
+    "digoxin": ["nausea", "slow_pulse"],
+    "amlodipine": ["swelling", "low_bp", "headache"],
+    "bisoprolol": ["slow_pulse", "low_bp", "masks_hypo"],
+    "omeprazole": ["headache", "diarrhoea", "b12"],
+    "levothyroxine": [],
+    "alendronic acid": ["gullet"],
+    "paracetamol": [],
+    "senna": ["diarrhoea"],
+    "macrogol": ["bloating"],
+    "lactulose": ["bloating"],
+}
+
+# Effects that add up when two medicines share them. Effects in the same family count as shared.
+ADDITIVE_FAMILY = {
+    "sedation": "drowsiness", "confusion": "confusion", "constipation": "constipation", "low_bp": "low blood pressure and dizziness",
+    "bleeding": "bleeding", "gi_bleed": "bleeding", "kidney": "kidney strain", "dehydration": "kidney strain",
+    "hypo": "low blood sugar", "low_na": "low sodium", "counts": "low blood counts", "fluid": "fluid retention",
+    "breathing": "slowed breathing", "retention": "difficulty passing urine", "hyper": "raised blood sugar",
+    "low_k": "low potassium", "bone": "bone thinning", "liver": "liver strain",
+}
+# Shared effects already covered by a named interaction rule (see INTERACTIONS): not repeated.
+COVERED_BY_INTERACTION_RULES = {"high_k", "qt", "serotonin"}
+
+# What a new medicine is usually given FOR, so we can ask: is an existing medicine causing the problem?
+TREATS_EFFECT = {"ondansetron": "nausea", "metoclopramide": "nausea", "senna": "constipation", "macrogol": "constipation",
+                 "lactulose": "constipation"}
+
+
+def side_effects(name: str) -> list:
+    return SIDE_EFFECTS.get(normalise(name), [])

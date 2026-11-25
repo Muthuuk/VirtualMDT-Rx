@@ -185,6 +185,42 @@ def test_batch_review():
     assert review_frame(synthetic_cohort(60, seed=1)).equals(out)
 
 
+def test_side_effect_checks():
+    r = run_case(case("SE-02"))                                # morphine added to diazepam, patient falls
+    titles = " | ".join(f.title for f in r.findings)
+    assert "morphine and tramadol both cause" in titles and "drowsiness" in titles
+    assert "Opioid with a benzodiazepine" in titles                       # named rule for the diazepam pair...
+    assert "morphine and diazepam both cause" not in titles               # ...so it is not reported a second time
+    assert any(f.code == "SE-020" for f in r.findings)
+    listed = next(f for f in r.findings if f.code == "SE-000")
+    assert "constipation" in listed.detail.lower() and "drowsiness" in listed.detail.lower()
+    assert any(f.code == "SE-030" for f in run_case(case("SE-03")).findings)   # existing medicine behind the infections
+    # a pair with a named interaction rule is not reported twice
+    assert sum(f.code == "SE-010" and "warfarin" in f.title for f in run_case(case("CA-05")).findings) == 0
+
+
+def test_every_existing_medicine_is_listed():
+    from vmdt.medreview import review_table
+    meds = ["methotrexate", "ramipril", "paracetamol", "mysterydrug 5mg", "trimethoprim"]
+    rows = review_table("trimethoprim", meds)
+    assert [r["medicine"] for r in rows] == meds                # one row each, same order, nothing dropped
+    by = {r["medicine"]: r for r in rows}
+    assert by["methotrexate"]["verdict"] == "STOP"
+    assert by["ramipril"]["verdict"] == "CAUTION"
+    assert by["paracetamol"]["verdict"] == "No clash found"
+    assert by["mysterydrug 5mg"]["verdict"] == "NOT CHECKED"
+    assert by["trimethoprim"]["verdict"] == "CAUTION"            # duplicate
+    assert all(r["verdict"] == "NOT CHECKED" for r in review_table("zzzmycin", ["ramipril"]))
+
+
+def test_side_effect_data_is_complete():
+    from vmdt import knowledge as kb
+    assert set(kb.SIDE_EFFECTS) == set(kb.DRUGS)
+    used = {e for fx in kb.SIDE_EFFECTS.values() for e in fx}
+    assert used <= set(kb.EFFECT_LABEL)
+    assert set(kb.ADDITIVE_FAMILY) <= set(kb.EFFECT_LABEL)
+
+
 def test_open_data_parsing(monkeypatch):
     """The live NHS data path, exercised with a canned reply (no internet needed)."""
     rows = [{"type": "chemical", "id": "0501130R0", "name": "Nitrofurantoin"},

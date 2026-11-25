@@ -51,7 +51,7 @@ is the Space configuration.
 | 1 · Consult the virtual team | Enter a request (or pick an example). The 3D room shows which experts were convened, their verdicts and whether each one's human counterpart can be reached now. Findings, a safety double-check and a draft follow. You then record your decision. |
 | 2 · Review a patient list | Run the team over a whole CSV list, or over 200 invented patients, and see what share is escalated and which rules fire most. |
 | 3 · What is being prescribed | Live monthly NHS prescribing counts for urine-infection antibiotics, diabetes medicines and cancer-care medicines, from OpenPrescribing.net. |
-| 4 · Engineering and assurance | The nine engineering principles, sixteen requirements traced to tests, and ten acceptance targets you can run on the spot. |
+| 4 · Engineering and assurance | The nine engineering principles, eighteen requirements traced to tests, and ten acceptance targets you can run on the spot. |
 | 5 · About and limits | What is new compared with the paper, and what the tool cannot do. |
 
 ## How a request is handled
@@ -62,7 +62,10 @@ request ─► 1 Triage notes ─► 2 Convene team ─► 3 Experts work in par
         7 Clinician decides ◄─ 6 Safety double-check ◄─ 5 Simpler-regimen ideas ◄─ 4 Combine findings
 ```
 
-* **Core team (always):** Pharmacist, Physio/OT, Allergy Safety, Guidance, Literature.
+* **Core team (always):** Pharmacist, Side-effect check, Physio/OT, Allergy Safety, Guidance, Literature.
+* **Medicine-by-medicine check:** the new medicine's main side effects are listed, and it is checked against every
+  existing medicine for named interactions and for side effects that add up (for example two medicines that both cause
+  drowsiness). An existing medicine that cannot be checked is shown as *not checked*, never skipped.
 * **Called in when needed:** Microbiologist, Urologist, Diabetologist, Oncologist, Kidney physician, Geriatrician.
 * **Outcomes:** *Ready* (green), *Ready with cautions* (amber), *Flag and escalate* (red: no draft, a safer option
   if one passes every rule), *Hard stop* (every usual option fails a rule; the clinician must resolve it).
@@ -72,7 +75,7 @@ request ─► 1 Triage notes ─► 2 Convene team ─► 3 Experts work in par
 
 ## What is new compared with the paper
 
-1. The team changes with the case, instead of five fixed agents.
+1. The team changes with the case, instead of five fixed agents, and a side-effect expert checks the new medicine against every existing medicine.
 2. A 3D consulting room with an availability rota for each expert's human counterpart (`vmdt/rota.py`; demo hours, edit to match your team).
 3. A stricter sign-off step with override reasons and a hash-chained decision log.
 4. A safety double-check that re-runs the hard rules without trusting the experts.
@@ -95,7 +98,7 @@ request ─► 1 Triage notes ─► 2 Convene team ─► 3 Experts work in par
 
 ```bash
 pip install pytest
-pytest -q                 # 58 tests
+pytest -q                 # 66 tests
 python -m vmdt.evaluate   # 10 acceptance targets; exits with an error if any fails
 ```
 
@@ -115,6 +118,8 @@ An invented example is in `data/sample_patients_synthetic.csv`. Use only anonymi
 
 ## Honest limits
 
+* Side effects and interactions come from a short illustrative list per medicine, not the full product information.
+  "No clash found" means none in this list.
 * The rule set covers about 60 medicines and three areas (urine infection, type 2 diabetes, cancer care). A medicine
   it does not know is flagged for manual review, never passed silently.
 * The evaluation cases and the rules were written by the same team. A perfect score shows the controls work as

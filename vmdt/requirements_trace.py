@@ -37,4 +37,8 @@ REQUIREMENTS = [
      "principle": "8 Human in the loop", "tests": ["test_rota_hours"]},
     {"id": "REQ-16", "goal": "Scale", "text": "A list of patients can be reviewed in one run.",
      "principle": "7 Evaluate before trusting", "tests": ["test_batch_review"]},
+    {"id": "REQ-17", "goal": "Safety", "text": "The new medicine's side effects are listed, and it is checked against EVERY existing medicine for named interactions and for side effects that add up; a medicine that cannot be checked is shown as not checked.",
+     "principle": "1 Testable requirements", "tests": ["test_side_effect_checks", "test_every_existing_medicine_is_listed"]},
+    {"id": "REQ-18", "goal": "Completeness", "text": "Every medicine in the catalogue has a side-effect entry and every side-effect code has a plain-English label.",
+     "principle": "2 Rules outside the model", "tests": ["test_side_effect_data_is_complete"]},
 ]

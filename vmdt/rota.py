@@ -20,6 +20,7 @@ ROTA = {
     "pharmacist": ("Practice pharmacist", WEEKDAYS, 8.0, 18.5),
     "ptot": ("Community therapy team", WEEKDAYS, 9.0, 17.0),
     "allergy": ("Allergy advice line", WEEKDAYS, 9.0, 17.0),
+    "side_effects": ("Practice pharmacist", WEEKDAYS, 8.0, 18.5),
     "guidance": None,
     "literature": None,
     "microbiology": ("Duty microbiologist", ALL_DAYS, 0.0, 24.0),

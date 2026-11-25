@@ -85,6 +85,17 @@ SUITE: List[tuple] = [
      "AMBER", ["PH-CON-005", "GU-020"], []),
     (P("CA-07", 58, "male", "dexamethasone", "8 mg", "once daily", 5, "cancer_care", egfr=85, conditions=["lung cancer", "type 2 diabetes"],
        current_meds=["metformin"]), "AMBER", ["PH-CON-004"], []),
+    # ---- side effects and clashes with existing medicines
+    (P("SE-01", 56, "female", "ibuprofen", "400 mg", "three times daily", 5, "other", egfr=88, current_meds=["sertraline", "omeprazole"]),
+     "AMBER", ["SE-000", "SE-010"], []),
+    (P("SE-02", 79, "female", "morphine", "5 mg modified-release", "twice daily", None, "cancer_care", egfr=70, falls_history=True,
+       conditions=["breast cancer"], current_meds=["diazepam", "tramadol", "senna", "amlodipine"]), "AMBER", ["PH-INT-014", "SE-010", "SE-020"], []),
+    (P("SE-03", 61, "female", "nitrofurantoin", "100 mg modified-release", "twice daily", 3, "uti", egfr=82,
+       current_meds=["metformin", "dapagliflozin"], conditions=["type 2 diabetes"]), "AMBER", ["SE-030"], []),
+    (P("SE-04", 74, "male", "oxybutynin", "5 mg", "twice daily", None, "other", egfr=70, conditions=["enlarged prostate"],
+       current_meds=["amlodipine"]), "AMBER", ["SE-024"], []),
+    (P("SE-05", 68, "male", "gliclazide", "40 mg", "once daily", None, "type2_diabetes", egfr=75, conditions=["type 2 diabetes"],
+       current_meds=["metformin", "bisoprolol"]), "GREEN", ["SE-027"], []),
     # ---- system behaviour
     (P("SY-01", 50, "female", "zzzmycin", "1 tablet", "once daily", 5, "other", egfr=90), "AMBER", ["PH-UNK-001"], []),
     (P("SY-02", 48, "male", "metformin", "500 mg", "once daily", None, "type2_diabetes", egfr=90, allergy_status_recorded=False,
@@ -104,4 +115,6 @@ PRESETS = {
     "Breast cancer: tamoxifen with paroxetine": _BY_REF["CA-01"],
     "Cancer pain: morphine without a laxative": _BY_REF["CA-03"],
     "Methotrexate written as daily": _BY_REF["CA-02"],
+    "Side effects add up: morphine with diazepam in a person who falls": _BY_REF["SE-02"],
+    "Existing medicine may be causing the infections": _BY_REF["SE-03"],
 }

@@ -31,7 +31,7 @@ from .models import (AMBER, ESCALATION_SIGNALS, FREQ_PER_DAY, INFO, LEVEL_ORDER,
 AGENT_TIMEOUT_S = 8.0
 CRITICAL_AGENTS = {"pharmacist", "allergy"}   # if one fails, the case goes to manual review
 # Fixed, made-up 'thinking times' used only when the demo delay is switched on.
-DEMO_DELAY_S = {"pharmacist": 0.9, "ptot": 0.5, "allergy": 0.6, "guidance": 0.8, "literature": 1.0,
+DEMO_DELAY_S = {"pharmacist": 0.9, "ptot": 0.5, "allergy": 0.6, "guidance": 0.8, "literature": 1.0, "side_effects": 0.7,
                 "microbiology": 0.7, "urology": 0.6, "diabetes": 0.6, "oncology": 0.6, "renal": 0.4, "geriatrics": 0.4}
 
 

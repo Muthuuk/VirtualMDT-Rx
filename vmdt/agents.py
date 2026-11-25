@@ -141,10 +141,6 @@ def ptot(p: dict) -> List[Finding]:
         out.append(F("OT-006", AMBER, "deliverability", "Swallowing difficulty recorded",
                      "Check a liquid or dispersible form is available. Modified-release tablets must not be crushed.",
                      "Patient profile; BNF (paraphrased)"))
-    if p.get("falls_history") and any(c in kb.classes(drug) for c in ("opioid", "benzodiazepine", "sulfonylurea")):
-        out.append(F("OT-007", AMBER, "deliverability", "History of falls",
-                     "This medicine can cause drowsiness, dizziness or low blood sugar and may raise the risk of falls.",
-                     "STOPP criteria (paraphrased)"))
     if per_day >= 4 and not p.get("cognitive_impairment"):
         out.append(F("OT-008", INFO, "deliverability", "Four-times-a-day dosing is hard to keep up",
                      "A twice-daily or once-daily option, if one exists, is usually taken more reliably.", "Adherence evidence (general)"))
@@ -251,6 +247,79 @@ def literature(p: dict) -> List[Finding]:
               f"Titles only, not graded or summarised, for the clinician to read: {lines}", "PubMed (NCBI E-utilities)")]
 
 
+def side_effect_check(p: dict) -> List[Finding]:
+    """Side effects of the new medicine: what they are, whether an existing medicine
+    causes the same ones, whether this patient is more exposed to them, and whether an
+    existing medicine may be causing the very problem now being treated."""
+    from . import medreview
+    out: List[Finding] = []
+    drug = kb.normalise(p["proposal"]["drug"])
+    if not kb.known(drug):
+        return out          # the pharmacist already flags an unknown medicine
+    fx = kb.side_effects(drug)
+    meds = [kb.normalise(m) for m in p.get("current_meds", []) if m.strip()]
+    if fx:
+        out.append(F("SE-000", INFO, "side_effect", f"Main recognised side effects of {drug}",
+                     ", ".join(kb.EFFECT_LABEL[e] for e in fx).capitalize() + ". Tell the patient what to look out for. "
+                     "This is a short illustrative list, not the full product information.", "Product information (paraphrased)"))
+
+    # 1. Same side effect from two medicines (adds up).
+    for m in meds:
+        if m == drug or not kb.known(m) or medreview.interaction_hits(drug, m):
+            continue        # a named interaction rule already covers this pair
+        shared = medreview.shared_effects(drug, m)
+        if shared:
+            out.append(F("SE-010", AMBER, "side_effect", f"{drug} and {m} both cause {' and '.join(shared)}",
+                         "The effects add together. Consider a lower dose, an alternative, or closer monitoring, and warn the patient.",
+                         "Product information (paraphrased)"))
+
+    # 2. Side effects that matter more for this patient.
+    conds = " ".join(p.get("conditions", [])).lower()
+    has_rule = lambda cond: any(kb.matches(drug, r["drug"]) and r["condition"] in conds for r in kb.CONDITION_RULES)
+    risky_for_falls = [kb.EFFECT_LABEL[e] for e in fx if e in ("sedation", "confusion", "low_bp", "hypo")]
+    if risky_for_falls and (p.get("falls_history") or p.get("frail")):
+        out.append(F("SE-020", AMBER, "side_effect", f"{drug} can cause {', '.join(risky_for_falls)} in a person who falls or is frail",
+                     "This raises the risk of falls and injury. Start low, review early, or choose an alternative.", "STOPP/START v3 (paraphrased)"))
+    if "confusion" in fx and p.get("cognitive_impairment"):
+        out.append(F("SE-021", AMBER, "side_effect", f"{drug} can cause confusion; memory problems are already recorded",
+                     "Confusion may worsen. Use the lowest dose and ask a carer to watch for change.", "STOPP/START v3 (paraphrased)"))
+    if "hyper" in fx and "diabetes" in conds and "steroid" not in kb.classes(drug):
+        out.append(F("SE-022", AMBER, "side_effect", f"{drug} can raise blood sugar in a person with diabetes",
+                     "Agree extra glucose checks.", "Product information (paraphrased)"))
+    if "kidney" in fx and p.get("egfr") is not None and p["egfr"] < 45 and not any(kb.matches(drug, r["drug"]) and p["egfr"] < r["below"] for r in kb.RENAL):
+        out.append(F("SE-023", AMBER, "side_effect", f"{drug} can strain the kidneys; kidney function is already reduced (eGFR {p['egfr']:g})",
+                     "Recheck kidney function and potassium within one to two weeks.", "Product information (paraphrased)"))
+    if "retention" in fx and any(k in conds for k in ("enlarged prostate", "bph", "urinary retention")):
+        out.append(F("SE-024", AMBER, "side_effect", f"{drug} can make it harder to pass urine",
+                     "Risk of urinary retention with an enlarged prostate. Consider an alternative.", "STOPP/START v3 (paraphrased)"))
+    if "fluid" in fx and "heart failure" in conds and not has_rule("heart failure"):
+        out.append(F("SE-025", AMBER, "side_effect", f"{drug} can cause fluid retention in a person with heart failure",
+                     "Watch weight and breathlessness; consider an alternative.", "Product information (paraphrased)"))
+    if "bone" in fx and "osteoporosis" in conds and not has_rule("osteoporosis"):
+        out.append(F("SE-026", AMBER, "side_effect", f"{drug} can thin the bones; osteoporosis is recorded",
+                     "Check bone protection is in place.", "Product information (paraphrased)"))
+    if "hypo" in fx and any("masks_hypo" in kb.side_effects(m) for m in meds):
+        out.append(F("SE-027", INFO, "side_effect", "A current medicine can hide the warning signs of low blood sugar",
+                     "Beta-blockers can mask a racing pulse and tremor. Make sure the patient knows the other signs of a 'hypo'.",
+                     "BNF (paraphrased)"))
+
+    # 3. Prescribing cascade: is an existing medicine causing the problem being treated?
+    if p["proposal"].get("indication") == "uti":
+        for m in meds:
+            if "uti" in kb.side_effects(m):
+                out.append(F("SE-030", AMBER, "side_effect", f"A current medicine ({m}) makes urine infections more likely",
+                             "Before treating infection after infection, review whether this medicine should continue.",
+                             "Product information; MHRA (paraphrased)"))
+    treats = kb.TREATS_EFFECT.get(drug)
+    if treats:
+        causes = [m for m in meds if treats in kb.side_effects(m)]
+        if causes:
+            out.append(F("SE-031", INFO, "side_effect", f"The {kb.EFFECT_LABEL[treats]} may be a side effect of {', '.join(causes)}",
+                         "Treating a side effect with another medicine is sometimes right (for example a laxative with an opioid), but check whether the cause can be reduced or changed.",
+                         "Medicines optimisation guidance (general)"))
+    return out
+
+
 # ------------------------------------------------------- consultants on call
 def microbiology(p: dict) -> List[Finding]:
     out: List[Finding] = []
@@ -338,6 +407,7 @@ SCOPE: Dict[str, List[str]] = {
     "allergy": _COMMON + ["allergies", "allergy_status_recorded", "current_meds"],
     "guidance": _COMMON + ["egfr", "pregnant", "conditions", "current_meds", "cognitive_impairment", "falls_history"],
     "literature": ["proposal", "live_evidence"],
+    "side_effects": _COMMON + ["egfr", "conditions", "current_meds", "falls_history", "frail", "cognitive_impairment"],
     "microbiology": _COMMON + ["uti_courses_6m", "culture_resistant_to"],
     "urology": _COMMON + ["uti_courses_6m", "conditions"],
     "diabetes": _COMMON + ["frail", "conditions", "egfr"],
@@ -349,6 +419,7 @@ SCOPE: Dict[str, List[str]] = {
 REGISTRY: Dict[str, dict] = {
     "pharmacist": {"fn": pharmacist, "name": "Pharmacist", "role": "Interactions, kidney dose, duplicates", "core": True, "colour": "#2E7D6B"},
     "ptot": {"fn": ptot, "name": "Physio / OT", "role": "Can the person manage this regimen?", "core": True, "colour": "#3B6FB6"},
+    "side_effects": {"fn": side_effect_check, "name": "Side-effect check", "role": "Side effects and clashes with current medicines", "core": True, "colour": "#A14F7E"},
     "allergy": {"fn": allergy_safety, "name": "Allergy Safety", "role": "Cross-reactions, allergy vs side effect", "core": True, "colour": "#B5562B"},
     "guidance": {"fn": guidance, "name": "Guidance", "role": "NICE, STOPP/START, shared care", "core": True, "colour": "#6A4C93"},
     "literature": {"fn": literature, "name": "Literature", "role": "Recent published safety evidence", "core": True, "colour": "#4A6572"},
