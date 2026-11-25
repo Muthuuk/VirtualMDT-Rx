@@ -41,4 +41,10 @@ REQUIREMENTS = [
      "principle": "1 Testable requirements", "tests": ["test_side_effect_checks", "test_every_existing_medicine_is_listed"]},
     {"id": "REQ-18", "goal": "Completeness", "text": "Every medicine in the catalogue has a side-effect entry and every side-effect code has a plain-English label.",
      "principle": "2 Rules outside the model", "tests": ["test_side_effect_data_is_complete"]},
+    {"id": "REQ-19", "goal": "Safety", "text": "The dose is checked against the usual and maximum dose (with a lower limit for older people where one applies); an overdose is stopped, and a dose that cannot be read or checked is said to be unchecked.",
+     "principle": "1 Testable requirements", "tests": ["test_dose_checks", "test_dose_parsing"]},
+    {"id": "REQ-20", "goal": "Safety", "text": "An antibiotic is not drafted when the lab test found no infection; repeated clear tests prompt assessment for inflammation instead of more antibiotics, and no drug swap is offered.",
+     "principle": "9 Ethics by design", "tests": ["test_no_antibiotic_without_infection"]},
+    {"id": "REQ-21", "goal": "Safety", "text": "Total antibiotic exposure over 12 months is counted and heavy exposure or long-term nitrofurantoin is flagged with the monitoring needed.",
+     "principle": "1 Testable requirements", "tests": ["test_antibiotic_exposure"]},
 ]

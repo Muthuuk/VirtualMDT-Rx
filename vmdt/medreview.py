@@ -67,3 +67,31 @@ def review_table(new: str, current_meds: List[str]) -> List[Dict[str, str]]:
 
 def effect_list(new: str) -> List[str]:
     return [kb.EFFECT_LABEL[e] for e in kb.side_effects(new)]
+
+
+def dose_summary(patient) -> str:
+    """One plain sentence on the requested dose against the limits held for the medicine."""
+    from .models import FREQ_PER_DAY
+    prop = patient.proposal
+    drug = kb.normalise(prop.drug)
+    lim = kb.DOSE_LIMITS.get(drug)
+    if not kb.known(drug):
+        return "Not checked: the medicine is not in the demo knowledge base."
+    if lim is None:
+        return "Not checked: this demo holds no dose limits for this medicine. Check the dose by hand."
+    parsed = kb.parse_dose_mg(prop.dose)
+    if parsed is None:
+        return f"Could not read the dose '{prop.dose}'. Write it as a number and unit, for example '100 mg'."
+    single, regular = parsed
+    if lim.get("weekly"):
+        total, per = regular, "week"
+    elif prop.frequency in ("single dose",):
+        total, per = regular, "day"
+    elif prop.frequency == "once weekly":
+        total, per = regular / 7, "day"
+    else:
+        total, per = regular * FREQ_PER_DAY.get(prop.frequency, 1), "day"
+    top = lim["elder_max"] if lim.get("elder_max") and patient.age >= 65 else lim["max"]
+    verdict = "ABOVE THE MAXIMUM" if total > top else ("above the usual range" if total > lim["usual"] else "within the usual range")
+    return (f"{prop.dose}, {prop.frequency} = {total:g} mg a {per}: {verdict}. Usual up to {lim['usual']:g} mg, "
+            f"maximum {top:g} mg a {per}{' (limit from age 65)' if top != lim['max'] else ''}. Limits are illustrative and need pharmacist confirmation.")

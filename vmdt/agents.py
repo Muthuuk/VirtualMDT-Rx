@@ -27,6 +27,58 @@ def _has_condition(p: dict, name: str) -> bool:
     return any(name in c.lower() for c in p.get("conditions", []))
 
 
+def dose_check(p: dict) -> List[Finding]:
+    """Is the amount right? Compares the single dose and the total per day (or per week)
+    with the usual and maximum adult doses, with a lower limit for older people where one exists."""
+    out: List[Finding] = []
+    prop = p["proposal"]
+    drug = kb.normalise(prop["drug"])
+    if not kb.known(drug):
+        return out
+    lim = kb.DOSE_LIMITS.get(drug)
+    if lim is None:
+        return [F("DO-005", INFO, "dosing", f"Dose of {drug} was not checked",
+                  "This demo holds no dose limits for this medicine (for example because the dose is set by weight, blood tests or response). Check the dose by hand.",
+                  "System")]
+    parsed = kb.parse_dose_mg(prop.get("dose", ""))
+    if parsed is None:
+        return [F("DO-004", AMBER, "data_gap", f"The dose of {drug} could not be read",
+                  f"The dose box says '{prop.get('dose', '')}'. Write it as a number and unit, for example '100 mg', so it can be checked against the limits.",
+                  "System")]
+    single, regular = parsed
+    freq = prop.get("frequency", "once daily")
+    weekly = lim.get("weekly", False)
+    if weekly:
+        total, per = regular, "week"
+    elif freq == "single dose":
+        total, per = regular, "day"
+    elif freq == "once weekly":
+        total, per = regular / 7, "day"
+    else:
+        total, per = regular * FREQ_PER_DAY.get(freq, 1), "day"
+    top = lim["max"]
+    why = "the maximum"
+    if lim.get("elder_max") and p.get("age", 0) >= 65:
+        top, why = lim["elder_max"], "the maximum from age 65"
+    src = "BNF; MHRA (paraphrased) - limits in this demo need pharmacist confirmation"
+    if total > top:
+        out.append(F("DO-001", RED, "dosing", f"Dose too high: {drug} {total:g} mg a {per} is above {why} of {top:g} mg",
+                     f"Requested: {prop.get('dose', '')}, {freq}. Reduce to within the limit, or record why a higher dose is needed.", src))
+    elif single > lim["single"]:
+        out.append(F("DO-003", RED, "dosing", f"Single dose too high: {drug} {single:g} mg at once is above the usual largest single dose of {lim['single']:g} mg",
+                     "Split the dose or reduce it.", src))
+    elif total > lim["usual"]:
+        out.append(F("DO-002", AMBER, "dosing", f"Higher than usual dose: {drug} {total:g} mg a {per} (usual up to {lim['usual']:g} mg, maximum {top:g} mg)",
+                     "Within the maximum but above the usual range. Check this is intended and that the reason is recorded.", src))
+    if lim.get("max_days") and (prop.get("duration_days") or 0) > lim["max_days"]:
+        out.append(F("DO-006", AMBER, "dosing", f"{drug} for {prop['duration_days']} days; the usual limit is {lim['max_days']} days",
+                     "Longer use raises the risk of serious side effects.", "MHRA drug safety advice (paraphrased)"))
+    if drug == "fosfomycin" and freq not in ("single dose",):
+        out.append(F("DO-007", AMBER, "dosing", "Fosfomycin is normally one single 3 g dose",
+                     f"The request says '{freq}'. Check this is intended.", "NICE NG109 (paraphrased)"))
+    return out
+
+
 # ---------------------------------------------------------------- core five
 def pharmacist(p: dict) -> List[Finding]:
     """Interactions, dose for kidney function and age, duplicates, monitoring."""
@@ -107,6 +159,7 @@ def pharmacist(p: dict) -> List[Finding]:
         out.append(F("PH-MON-002", INFO, "guideline", "Give 'sick day' advice",
                      "Tell the patient to pause this medicine when vomiting, dehydrated or not eating (risk of ketoacidosis).",
                      "MHRA drug safety advice (paraphrased)"))
+    out.extend(dose_check(p))
     if drug in kb.SUPPLY_ALERTS:
         out.append(F("PH-SUP-001", AMBER, "supply", f"Supply problem reported for {drug}", kb.SUPPLY_ALERTS[drug], "Supply feed"))
     return out
@@ -322,10 +375,19 @@ def side_effect_check(p: dict) -> List[Finding]:
 
 # ------------------------------------------------------- consultants on call
 def microbiology(p: dict) -> List[Finding]:
+    """Is there really an infection, will this antibiotic work, and how much antibiotic has this person already had?"""
     out: List[Finding] = []
-    drug = kb.normalise(p["proposal"]["drug"])
+    prop = p["proposal"]
+    drug = kb.normalise(prop["drug"])
     if "antibiotic" not in kb.classes(drug):
         return out
+    culture = (p.get("urine_culture") or "not recorded").lower()
+    if prop.get("indication") == "uti" and culture == "no infection found":
+        out.append(F("MB-010", RED, "red_flag", "The lab test found no infection, but an antibiotic is requested",
+                     "An antibiotic cannot help symptoms that are not caused by infection, and it adds side effects and resistance. "
+                     "Bladder symptoms with clear tests are often inflammation (for example bladder pain syndrome, also called interstitial cystitis). "
+                     "Do not prescribe; look for another cause and consider referral.",
+                     "NICE NG109 and NG112 (paraphrased); bladder pain syndrome guidance (general)"))
     if drug in [kb.normalise(x) for x in p.get("culture_resistant_to", [])]:
         out.append(F("MB-001", RED, "stewardship", f"Recent urine culture shows resistance to {drug}",
                      "This antibiotic is unlikely to work. Choose one the organism is sensitive to.", "Culture result on record"))
@@ -333,6 +395,21 @@ def microbiology(p: dict) -> List[Finding]:
         out.append(F("MB-002", AMBER, "stewardship", f"{p['uti_courses_6m']} antibiotic courses for urine infection in 6 months",
                      "Send a urine culture before treating, review past results, and consider why infections keep returning.",
                      "NICE NG112 recurrent UTI (paraphrased)"))
+    if prop.get("indication") == "uti" and culture == "not sent" and \
+            (p.get("sex") == "male" or p.get("pregnant") or p.get("age", 0) >= 65 or p.get("uti_courses_6m", 0) >= 1):
+        out.append(F("MB-012", AMBER, "stewardship", "No urine sample has been sent to the lab",
+                     "Guidance asks for a urine culture in men, in pregnancy, in people aged 65 or over and when symptoms return or persist, so that treatment rests on a confirmed infection.",
+                     "NICE NG109 (paraphrased)"))
+    days = p.get("antibiotic_days_12m", 0) or 0
+    if days >= kb.HEAVY_ANTIBIOTIC_DAYS_12M:
+        out.append(F("MB-013", AMBER, "stewardship", f"Heavy antibiotic exposure: {days} days of antibiotics in the last 12 months",
+                     "Repeated or long courses drive resistance and side effects. Before adding more, confirm the infection with a lab test and review whether antibiotics are helping.",
+                     "NICE NG112; UK antimicrobial stewardship guidance (paraphrased)"))
+    course = prop.get("duration_days") or 0
+    if drug == "nitrofurantoin" and (course >= kb.NITROFURANTOIN_LONG_COURSE_DAYS or days >= 90):
+        out.append(F("MB-014", AMBER, "safety_signal", "Long-term nitrofurantoin needs lung and liver monitoring",
+                     "Long or repeated courses can damage the lungs, liver and nerves. Ask about new cough, breathlessness or tingling, arrange monitoring, and review regularly whether it is still needed.",
+                     "MHRA drug safety advice; BNF (paraphrased)"))
     return out
 
 
@@ -345,6 +422,11 @@ def urology(p: dict) -> List[Finding]:
     if p.get("sex") == "male" and p.get("uti_courses_6m", 0) >= 2:
         out.append(F("UR-002", AMBER, "red_flag", "Recurrent urine infection in a man",
                      "Consider referral to look for an underlying cause.", "NICE NG112 (paraphrased)"))
+    if p.get("clear_cultures_12m", 0) >= 2:
+        out.append(F("UR-004", AMBER, "red_flag", f"Bladder symptoms keep returning but {p['clear_cultures_12m']} lab tests in 12 months found no infection",
+                     "This pattern points away from infection and towards inflammation, such as bladder pain syndrome (interstitial cystitis). "
+                     "Refer for assessment before prescribing more antibiotics.",
+                     "NICE NG112 (paraphrased); bladder pain syndrome guidance (general)"))
     if "flank_pain" in p.get("triage", []) and "fever" in p.get("triage", []):
         out.append(F("UR-003", RED, "red_flag", "Fever with loin pain",
                      "This suggests a kidney infection, not a simple bladder infection. A lower-UTI course is not enough; assess for same-day treatment or admission.",
@@ -408,8 +490,8 @@ SCOPE: Dict[str, List[str]] = {
     "guidance": _COMMON + ["egfr", "pregnant", "conditions", "current_meds", "cognitive_impairment", "falls_history"],
     "literature": ["proposal", "live_evidence"],
     "side_effects": _COMMON + ["egfr", "conditions", "current_meds", "falls_history", "frail", "cognitive_impairment"],
-    "microbiology": _COMMON + ["uti_courses_6m", "culture_resistant_to"],
-    "urology": _COMMON + ["uti_courses_6m", "conditions"],
+    "microbiology": _COMMON + ["uti_courses_6m", "culture_resistant_to", "urine_culture", "antibiotic_days_12m", "pregnant"],
+    "urology": _COMMON + ["uti_courses_6m", "conditions", "clear_cultures_12m"],
     "diabetes": _COMMON + ["frail", "conditions", "egfr"],
     "oncology": _COMMON + ["conditions", "current_meds"],
     "renal": _COMMON + ["egfr"],

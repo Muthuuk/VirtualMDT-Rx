@@ -474,3 +474,77 @@ TREATS_EFFECT = {"ondansetron": "nausea", "metoclopramide": "nausea", "senna": "
 
 def side_effects(name: str) -> list:
     return SIDE_EFFECTS.get(normalise(name), [])
+
+
+# --------------------------------------------------------------------------
+# Adult oral dose limits in mg (illustrative, paraphrased from the BNF and MHRA
+# advice). "usual" = top of the usual daily range; "max" = highest daily dose
+# normally licensed; "single" = largest single dose; "elder_max" = daily limit
+# from age 65. Weekly medicines are per WEEK. A PHARMACIST MUST CONFIRM THESE
+# BEFORE ANY REAL USE: doses differ by indication, formulation, kidney function,
+# weight and age, and this table does not capture that.
+# --------------------------------------------------------------------------
+DOSE_LIMITS = {
+    "nitrofurantoin": {"usual": 200, "max": 400, "single": 100},
+    "trimethoprim": {"usual": 400, "max": 400, "single": 200},
+    "pivmecillinam": {"usual": 800, "max": 1600, "single": 400},
+    "fosfomycin": {"usual": 3000, "max": 3000, "single": 3000},
+    "cefalexin": {"usual": 1500, "max": 6000, "single": 1500},
+    "amoxicillin": {"usual": 1500, "max": 3000, "single": 1000},
+    "ciprofloxacin": {"usual": 1000, "max": 1500, "single": 750},
+    "clarithromycin": {"usual": 1000, "max": 1000, "single": 500},
+    "metformin": {"usual": 2000, "max": 3000, "single": 1000},
+    "gliclazide": {"usual": 160, "max": 320, "single": 160},
+    "glibenclamide": {"usual": 5, "max": 15, "single": 15},
+    "dapagliflozin": {"usual": 10, "max": 10, "single": 10},
+    "empagliflozin": {"usual": 10, "max": 25, "single": 25},
+    "sitagliptin": {"usual": 100, "max": 100, "single": 100},
+    "linagliptin": {"usual": 5, "max": 5, "single": 5},
+    "pioglitazone": {"usual": 30, "max": 45, "single": 45},
+    "tamoxifen": {"usual": 20, "max": 40, "single": 40},
+    "letrozole": {"usual": 2.5, "max": 2.5, "single": 2.5},
+    "anastrozole": {"usual": 1, "max": 1, "single": 1},
+    "methotrexate": {"usual": 25, "max": 25, "single": 25, "weekly": True},
+    "ondansetron": {"usual": 16, "max": 24, "single": 16},
+    "metoclopramide": {"usual": 30, "max": 30, "single": 10, "max_days": 5},
+    "ibuprofen": {"usual": 1200, "max": 2400, "single": 800},
+    "naproxen": {"usual": 1000, "max": 1250, "single": 750},
+    "paracetamol": {"usual": 4000, "max": 4000, "single": 1000},
+    "simvastatin": {"usual": 40, "max": 80, "single": 80},
+    "atorvastatin": {"usual": 80, "max": 80, "single": 80},
+    "citalopram": {"usual": 20, "max": 40, "single": 40, "elder_max": 20},
+    "sertraline": {"usual": 100, "max": 200, "single": 200},
+    "fluoxetine": {"usual": 20, "max": 60, "single": 60},
+    "paroxetine": {"usual": 20, "max": 60, "single": 60},
+    "tramadol": {"usual": 400, "max": 400, "single": 100},
+    "diazepam": {"usual": 15, "max": 30, "single": 10},
+    "oxybutynin": {"usual": 15, "max": 20, "single": 5, "elder_max": 10},
+    "amlodipine": {"usual": 10, "max": 10, "single": 10},
+    "ramipril": {"usual": 10, "max": 10, "single": 10},
+    "bisoprolol": {"usual": 10, "max": 20, "single": 20},
+    "bendroflumethiazide": {"usual": 5, "max": 10, "single": 10},
+    "apixaban": {"usual": 10, "max": 20, "single": 10},
+}
+
+# Days of antibiotics in 12 months that count as heavy exposure, and the course
+# length from which nitrofurantoin needs lung and liver monitoring.
+HEAVY_ANTIBIOTIC_DAYS_12M = 28
+NITROFURANTOIN_LONG_COURSE_DAYS = 28
+
+
+def parse_dose_mg(text: str):
+    """Read a dose such as '100 mg modified-release', '1 g' or '400 mg then 200 mg'.
+    Returns (largest single dose in mg, regular dose in mg) or None if it cannot be read
+    or is weight-based ('/kg', '/m2'), which this demo cannot check."""
+    import re
+    t = (text or "").lower().replace(",", "")
+    if not t or "/kg" in t or "/m2" in t or "per kg" in t:
+        return None
+    vals = []
+    for num, unit in re.findall(r"(\d+(?:\.\d+)?)\s*(mg|g|micrograms?|mcg)\b", t):
+        v = float(num) * {"mg": 1, "g": 1000}.get(unit, 0.001)
+        vals.append(v)
+    if not vals:
+        return None
+    regular = vals[-1] if "then" in t else max(vals)   # '400 mg then 200 mg': 200 mg is the regular dose
+    return max(vals), regular

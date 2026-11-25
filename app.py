@@ -30,6 +30,7 @@ from vmdt.requirements_trace import REQUIREMENTS
 
 INDICATIONS = {"Urine infection (UTI)": "uti", "Type 2 diabetes": "type2_diabetes", "Cancer care": "cancer_care", "Other": "other"}
 IND_LABEL = {v: k for k, v in INDICATIONS.items()}
+CULTURE_CHOICES = ["not recorded", "not sent", "awaited", "infection confirmed", "no infection found"]
 FREQS = ["once daily", "twice daily", "three times daily", "four times daily", "once weekly", "single dose", "as needed"]
 FUNCTION_FLAGS = {"Memory or thinking problems": "cognitive_impairment", "Hand or grip problems": "dexterity_problem",
                   "Swallowing difficulty": "swallowing_difficulty", "Poor eyesight": "visual_impairment",
@@ -69,7 +70,8 @@ def _lines(text: str) -> list:
 
 
 def build_patient(ref, age, sex, egfr, pregnant, trimester, indication, drug, dose, freq, days, meds, conds,
-                  allergies, allergy_recorded, function, courses, resistant, missed, notes) -> Patient:
+                  allergies, allergy_recorded, function, courses, resistant, missed, notes,
+                  culture="not recorded", clear_tests=0, abx_days=0) -> Patient:
     al = []
     for item in _lines(allergies):
         sub, _, reac = item.partition(":")
@@ -84,7 +86,8 @@ def build_patient(ref, age, sex, egfr, pregnant, trimester, indication, drug, do
         allergy_status_recorded=bool(allergy_recorded),
         current_meds=[m.strip() for m in (meds if isinstance(meds, list) else _lines(meds)) if m and m.strip()],
         uti_courses_6m=int(courses or 0), culture_resistant_to=_lines(resistant), missed_collections=int(missed or 0),
-        notes=notes or "", **flags)
+        notes=notes or "", urine_culture=(culture or "not recorded").lower(), clear_cultures_12m=int(clear_tests or 0),
+        antibiotic_days_12m=int(abx_days or 0), **flags)
 
 
 def load_preset(name):
@@ -93,7 +96,7 @@ def load_preset(name):
             p.proposal.dose, p.proposal.frequency, p.proposal.duration_days, list(p.current_meds), "; ".join(p.conditions),
             "; ".join(f"{a.substance}:{a.reaction}" for a in p.allergies), p.allergy_status_recorded,
             [k for k, v in FUNCTION_FLAGS.items() if getattr(p, v)], p.uti_courses_6m, "; ".join(p.culture_resistant_to),
-            p.missed_collections, p.notes)
+            p.missed_collections, p.notes, p.urine_culture, p.clear_cultures_12m, p.antibiotic_days_12m)
 
 
 def banner(res) -> str:
@@ -135,6 +138,7 @@ def med_review_html(res) -> str:
     else:
         chips = "".join(f"<span class='vm-chip'>{escape(e)}</span>" for e in fx) or "None listed in the demo set."
         fx_html = f"<div class='vm-check'><b>Main recognised side effects of {escape(drug)}:</b><br>{chips}</div>"
+    fx_html += f"<div class='vm-check' style='margin-top:8px'><b>Dose check:</b> {escape(medreview.dose_summary(p))}</div>"
     rows = medreview.review_table(drug, p.current_meds)
     if not rows:
         table = "<div class='vm-check'>No existing medicines were entered, so there was nothing to check the new medicine against.</div>"
@@ -313,8 +317,11 @@ request, runs all the experts at the same moment, and hands the prescriber a che
 4. **A safety double-check that does not trust the experts.** The hard rules are re-run separately; anything an expert missed is added back.
 5. **A medicine-by-medicine check.** The new medicine's side effects are listed, and it is checked against every existing
    medicine for named interactions and for side effects that add up. Anything that cannot be checked is shown as not checked.
-6. **Whole-list review.** A practice list can be reviewed in one run, and live NHS open data shows what is actually being prescribed.
-7. **Built with a software engineering method.** Eighteen requirements traced to tests, ten acceptance targets, a release gate and a
+6. **Dose, infection and exposure checks.** The dose is compared with the usual and maximum dose. An antibiotic is not drafted
+   when the lab test found no infection; repeated clear tests point the prescriber towards inflammation instead. Total days of
+   antibiotics over 12 months are counted, with a warning for heavy exposure and long-term nitrofurantoin.
+7. **Whole-list review.** A practice list can be reviewed in one run, and live NHS open data shows what is actually being prescribed.
+8. **Built with a software engineering method.** Twenty-one requirements traced to tests, ten acceptance targets, a release gate and a
    tamper-evident log (the same approach as UroAgent).
 
 ## Limits you must know
@@ -383,7 +390,11 @@ def build() -> gr.Blocks:
                         allergies = gr.Textbox(label="Allergies, as substance:reaction", placeholder="penicillin:anaphylaxis", scale=3)
                         allergy_rec = gr.Checkbox(label="Allergy status recorded", value=True)
                     function = gr.CheckboxGroup(list(FUNCTION_FLAGS), label="Day-to-day function")
-                    with gr.Accordion("Infection history and collection record", open=False):
+                    with gr.Accordion("Infection tests and antibiotic history", open=True):
+                        culture = gr.Dropdown(CULTURE_CHOICES, label="Latest urine lab test (culture)", value="not recorded")
+                        with gr.Row():
+                            clear_tests = gr.Number(label="Lab tests in 12 months that found NO infection", value=0, precision=0)
+                            abx_days = gr.Number(label="Total days of antibiotics in 12 months", value=0, precision=0)
                         with gr.Row():
                             courses = gr.Number(label="Antibiotic courses for UTI in 6 months", value=0, precision=0)
                             missed = gr.Number(label="Prescriptions not collected recently", value=0, precision=0)
@@ -413,7 +424,7 @@ def build() -> gr.Blocks:
                     audit_df = gr.Dataframe(label="Decision log for this session (tamper-evident)", interactive=False)
                     audit_dl = gr.File(label="Download the decision log")
             inputs = [ref, age, sex, egfr, pregnant, trimester, indication, drug, dose, freq, days, meds, conds, allergies,
-                      allergy_rec, function, courses, resistant, missed, notes]
+                      allergy_rec, function, courses, resistant, missed, notes, culture, clear_tests, abx_days]
             preset.change(load_preset, preset, inputs)
             go.click(convene_click, [time_mode, custom_time, live, delay] + inputs,
                      [state, out_banner, out_room, out_findings, decision, advice, ack, sign_msg])

@@ -67,6 +67,10 @@ class Patient:
     uti_courses_6m: int = 0
     culture_resistant_to: List[str] = field(default_factory=list)
     missed_collections: int = 0
+    # Infection evidence and antibiotic exposure
+    urine_culture: str = "not recorded"   # not recorded / not sent / awaited / infection confirmed / no infection found
+    clear_cultures_12m: int = 0            # lab tests in the last 12 months that found NO infection
+    antibiotic_days_12m: int = 0           # total days of antibiotics in the last 12 months
     notes: str = ""                # free text; screened by the triage step
 
     def to_dict(self) -> dict:

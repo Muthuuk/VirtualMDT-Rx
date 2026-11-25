@@ -237,7 +237,7 @@ def run_case(p: Patient, when: Optional[datetime] = None, live_evidence: bool = 
         if critical_down:
             headline = "Manual review needed: a critical safety check could not be completed. No draft produced."
         elif only_red_flags:
-            headline = "Flag & Escalate: a red-flag symptom means a prescription alone is not the right action."
+            headline = "Flag & Escalate: the findings mean that prescribing this medicine is not the right action. See the reasons below."
         elif alt:
             alternative = _format_rx(alt)
             headline = "Flag & Escalate: the requested medicine is not safe here. A safer option is suggested."

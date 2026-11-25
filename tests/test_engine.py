@@ -221,6 +221,52 @@ def test_side_effect_data_is_complete():
     assert set(kb.ADDITIVE_FAMILY) <= set(kb.EFFECT_LABEL)
 
 
+def test_dose_parsing():
+    from vmdt import knowledge as kb
+    assert kb.parse_dose_mg("100 mg modified-release") == (100, 100)
+    assert kb.parse_dose_mg("1 g") == (1000, 1000)
+    assert kb.parse_dose_mg("400 mg then 200 mg") == (400, 200)
+    assert kb.parse_dose_mg("40-80 mg") == (80, 80)
+    assert kb.parse_dose_mg("1250 mg/m2") is None and kb.parse_dose_mg("one tablet") is None and kb.parse_dose_mg("") is None
+    for drug, lim in kb.DOSE_LIMITS.items():
+        assert drug in kb.DRUGS and lim["usual"] <= lim["max"]
+
+
+def test_dose_checks():
+    over = run_case(case("DOSE-02"))                          # nitrofurantoin 200 mg four times a day = 800 mg
+    f = next(x for x in over.findings if x.code == "DO-001")
+    assert over.outcome == "RED" and over.draft is None and "800 mg" in f.title and "400 mg" in f.title
+    assert over.alternative and "trimethoprim" in over.alternative.lower()
+    assert run_case(case("DOSE-01")).outcome == "AMBER"       # 400 mg a day: allowed, but above usual
+    assert not any(x.code.startswith("DO-00") and x.level != "INFO" for x in run_case(case("UTI-01")).findings)  # standard dose passes
+    old, young = case("DOSE-04"), case("DOSE-04")
+    young.age = 50
+    assert run_case(old).outcome == "RED"                      # citalopram 40 mg: over the limit from age 65
+    assert not any(x.code == "DO-001" for x in run_case(young).findings)
+    assert any(x.code == "DO-004" for x in run_case(case("DOSE-06")).findings)   # unreadable dose is said to be unchecked
+    assert any(x.code == "DO-005" for x in run_case(case("CA-03")).findings)     # no limit held: said to be unchecked
+    assert any(x.code == "DO-003" for x in run_case(case("DOSE-07")).findings)   # single dose too large
+
+
+def test_no_antibiotic_without_infection():
+    r = run_case(case("INF-01"))
+    assert r.outcome == "RED" and r.draft is None
+    assert r.alternative is None                               # swapping to another antibiotic would repeat the mistake
+    assert any(f.code == "MB-010" for f in r.findings) and any(f.code == "UR-004" for f in r.findings)
+    assert "inflammation" in next(f for f in r.findings if f.code == "MB-010").detail
+    assert sign_off(r, "APPROVE", "GP7", "GP", AuditLog())[0] is False
+    ok = run_case(case("INF-05"))                              # infection confirmed: goes ahead
+    assert ok.outcome == "GREEN" and ok.draft
+
+
+def test_antibiotic_exposure():
+    r = run_case(case("INF-03"))
+    assert {"MB-013", "MB-014"} <= {f.code for f in r.findings}
+    assert "120 days" in next(f for f in r.findings if f.code == "MB-013").title
+    light = case("INF-05"); light.antibiotic_days_12m = 6
+    assert not any(f.code in ("MB-013", "MB-014") for f in run_case(light).findings)
+
+
 def test_open_data_parsing(monkeypatch):
     """The live NHS data path, exercised with a canned reply (no internet needed)."""
     rows = [{"type": "chemical", "id": "0501130R0", "name": "Nitrofurantoin"},

@@ -7,7 +7,7 @@ CSV columns (only patient_ref, age, sex and proposed_drug are required):
   patient_ref, age, sex, egfr, pregnant, trimester, conditions, allergies,
   current_meds, proposed_drug, dose, frequency, duration_days, indication,
   uti_courses_6m, culture_resistant_to, cognitive_impairment, dexterity_problem,
-  falls_history, frail, notes
+  falls_history, frail, notes, urine_culture, clear_cultures_12m, antibiotic_days_12m
 Lists use ';' between items. Allergies use 'substance:reaction', e.g. 'penicillin:anaphylaxis'.
 """
 from __future__ import annotations
@@ -55,6 +55,8 @@ def row_to_patient(r: dict) -> Patient:
         uti_courses_6m=int(_num(r.get("uti_courses_6m")) or 0), culture_resistant_to=_split(r.get("culture_resistant_to")),
         cognitive_impairment=_flag(r.get("cognitive_impairment")), dexterity_problem=_flag(r.get("dexterity_problem")),
         falls_history=_flag(r.get("falls_history")), frail=_flag(r.get("frail")),
+        urine_culture=(str(r.get("urine_culture")).strip().lower() if r.get("urine_culture") is not None and not pd.isna(r.get("urine_culture")) and str(r.get("urine_culture")).strip() else "not recorded"),
+        clear_cultures_12m=int(_num(r.get("clear_cultures_12m")) or 0), antibiotic_days_12m=int(_num(r.get("antibiotic_days_12m")) or 0),
         notes="" if pd.isna(r.get("notes", "")) else str(r.get("notes", "")),
     )
 
@@ -92,6 +94,11 @@ def synthetic_cohort(n: int = 200, seed: int = 42) -> pd.DataFrame:
         "cancer_care": (["tamoxifen", "letrozole", "morphine", "ondansetron", "dexamethasone", "methotrexate"],
                         ["once daily", "once daily", "twice daily", "twice daily", "once daily", "once weekly"]),
     }
+    doses = {"nitrofurantoin": "100 mg modified-release", "trimethoprim": "200 mg", "pivmecillinam": "400 mg then 200 mg",
+             "fosfomycin": "3 g", "cefalexin": "500 mg", "ciprofloxacin": "500 mg", "metformin": "500 mg", "gliclazide": "40 mg",
+             "dapagliflozin": "10 mg", "sitagliptin": "100 mg", "pioglitazone": "15 mg", "glibenclamide": "5 mg", "tamoxifen": "20 mg",
+             "letrozole": "2.5 mg", "morphine": "10 mg modified-release", "ondansetron": "8 mg", "dexamethasone": "4 mg",
+             "methotrexate": "10 mg"}
     background = ["amlodipine", "atorvastatin", "ramipril", "omeprazole", "paracetamol", "bisoprolol", "levothyroxine",
                   "sertraline", "paroxetine", "warfarin", "furosemide", "spironolactone", "methotrexate", "simvastatin",
                   "senna", "prednisolone", "citalopram", "metformin", "ibuprofen"]
@@ -113,7 +120,7 @@ def synthetic_cohort(n: int = 200, seed: int = 42) -> pd.DataFrame:
             "patient_ref": f"SYN-{i + 1:04d}", "age": age, "sex": sex, "egfr": egfr,
             "pregnant": "yes" if sex == "female" and 20 <= age <= 40 and ind == "uti" and rng.random() < 0.08 else "no",
             "trimester": 1, "conditions": ";".join(conds), "allergies": allergies, "current_meds": ";".join(meds),
-            "proposed_drug": drug, "dose": "", "frequency": freq, "duration_days": days, "indication": ind,
+            "proposed_drug": drug, "dose": doses[drug], "frequency": freq, "duration_days": days, "indication": ind,
             "uti_courses_6m": rng.choice([0, 0, 0, 1, 2, 3]) if ind == "uti" else 0, "culture_resistant_to": "",
             "cognitive_impairment": "yes" if age > 75 and rng.random() < 0.2 else "no", "dexterity_problem": "no",
             "falls_history": "yes" if age > 75 and rng.random() < 0.25 else "no", "frail": "yes" if age > 80 and rng.random() < 0.4 else "no",
