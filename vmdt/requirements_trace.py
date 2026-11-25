@@ -1,0 +1,40 @@
+"""Goal-driven, testable requirements (SE principle 1), each traced to tests.
+
+`tests/test_traceability.py` fails if a requirement names a test that does not
+exist, so a requirement can never quietly lose its test.
+"""
+REQUIREMENTS = [
+    {"id": "REQ-01", "goal": "Safety", "text": "Every seeded prescribing hazard in the evaluation suite is detected.",
+     "principle": "1 Testable requirements", "tests": ["test_suite_outcomes", "test_target_hazard_recall"]},
+    {"id": "REQ-02", "goal": "Safety", "text": "Safety rules are data outside any model and are re-checked independently of the experts.",
+     "principle": "2 Rules outside the model", "tests": ["test_double_check_catches_a_faulty_expert"]},
+    {"id": "REQ-03", "goal": "Reliability", "text": "Each expert sees only its own slice of the record.",
+     "principle": "3 One agent, one job", "tests": ["test_scoped_payloads"]},
+    {"id": "REQ-04", "goal": "Privacy", "text": "Outbound look-ups carry only medicine and condition names.",
+     "principle": "4 Least privilege", "tests": ["test_outbound_queries_have_no_patient_data"]},
+    {"id": "REQ-05", "goal": "Reproducibility", "text": "The same case always gives the same result and hash.",
+     "principle": "5 Explicit state", "tests": ["test_deterministic"]},
+    {"id": "REQ-06", "goal": "Accountability", "text": "Every decision is written to a tamper-evident log with no identifiers.",
+     "principle": "6 Observability and audit", "tests": ["test_audit_chain_detects_tampering", "test_audit_has_no_identifiers"]},
+    {"id": "REQ-07", "goal": "Assurance", "text": "A release is blocked if any acceptance target fails.",
+     "principle": "7 Evaluate before trusting", "tests": ["test_all_targets_met"]},
+    {"id": "REQ-08", "goal": "Human control", "text": "Nothing is issued without a named clinician's decision; an escalated case cannot simply be approved.",
+     "principle": "8 Human in the loop", "tests": ["test_escalated_case_cannot_be_approved", "test_override_needs_reason",
+                                                  "test_amber_needs_acknowledgement", "test_signoff_needs_clinician"]},
+    {"id": "REQ-09", "goal": "Safety", "text": "An escalated case never carries a draft; any suggested alternative passes every hard rule.",
+     "principle": "2 Rules outside the model", "tests": ["test_no_draft_when_escalated", "test_alternatives_are_safe"]},
+    {"id": "REQ-10", "goal": "Safety", "text": "An unknown medicine is flagged for manual review, never passed silently.",
+     "principle": "9 Ethics by design", "tests": ["test_unknown_drug_is_flagged"]},
+    {"id": "REQ-11", "goal": "Resilience", "text": "A crashed expert never crashes the case; a crashed critical expert sends the case to manual review.",
+     "principle": "6 Observability and audit", "tests": ["test_failed_expert_is_contained"]},
+    {"id": "REQ-12", "goal": "Safety", "text": "Negated symptoms in notes ('no fever') do not raise red flags.",
+     "principle": "1 Testable requirements", "tests": ["test_triage_ignores_negation"]},
+    {"id": "REQ-13", "goal": "Explainability", "text": "Every finding names its expert, rule code and knowledge source.",
+     "principle": "6 Observability and audit", "tests": ["test_findings_are_traceable"]},
+    {"id": "REQ-14", "goal": "Fairness", "text": "Changing details that should not matter (case reference, sex where no rule uses it) does not change the result.",
+     "principle": "9 Ethics by design", "tests": ["test_irrelevant_details_do_not_change_outcome"]},
+    {"id": "REQ-15", "goal": "Availability", "text": "The screen shows truthfully whether each expert's human counterpart can be reached now.",
+     "principle": "8 Human in the loop", "tests": ["test_rota_hours"]},
+    {"id": "REQ-16", "goal": "Scale", "text": "A list of patients can be reviewed in one run.",
+     "principle": "7 Evaluate before trusting", "tests": ["test_batch_review"]},
+]

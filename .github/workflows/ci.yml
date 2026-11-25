@@ -1,0 +1,20 @@
+# Continuous integration and release gate.
+# Every push runs the tests and the ten acceptance targets. If any target fails,
+# the job fails, so a version that misses a target cannot be merged or released.
+name: tests-and-release-gate
+on:
+  push:
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt pytest
+      - name: Unit, safety and traceability tests
+        run: pytest -q
+      - name: Acceptance targets (release gate)
+        run: python -m vmdt.evaluate
