@@ -28,12 +28,13 @@ CSS = """
 .vmdt-room .sub{margin:0 0 16px 8px;font-size:1.02rem;color:#C9D3DF !important}
 .vmdt-row{display:flex;flex-wrap:wrap;justify-content:center;gap:16px 14px;transform-style:preserve-3d}
 .vx{width:178px;height:322px;position:relative;transform-style:preserve-3d;outline:none;cursor:pointer}
+.vx::before{content:'';position:absolute;inset:0;background:rgba(0,0,0,.001);border-radius:16px}
 .vx .turn{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.2,.7,.2,1)}
 .vx:hover .turn,.vx:focus .turn,.vx:focus-within .turn{transform:rotateY(180deg)}
 .vx .face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:16px;
   background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.16);
   box-shadow:0 18px 30px rgba(0,0,0,.35);padding:12px 10px;text-align:center}
-.vx .back{transform:rotateY(180deg);text-align:left;overflow:auto;background:linear-gradient(180deg,#22304a,#18233a)}
+.vx .back{transform:rotateY(180deg);text-align:left;overflow-y:auto;overflow-x:hidden;word-break:break-word;background:linear-gradient(180deg,#22304a,#18233a)}
 .vx .back b{font-size:1.02rem;color:#fff}
 .vx .back p{font-size:.95rem;line-height:1.35;margin:6px 0;color:#DCE4EE}
 .vx .back .src{font-size:.82rem;color:#9FB0C4}

@@ -19,7 +19,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from vmdt import __version__, knowledge as kb, medreview, opendata, room3d
+from vmdt import __version__, knowledge as kb, medreview, meeting, opendata, room3d
 from vmdt.audit import AuditLog
 from vmdt.batch import review_frame, synthetic_cohort
 from vmdt.cases import PRESETS, SUITE
@@ -55,7 +55,43 @@ CSS = """
 .vm-tag{display:inline-block;font-size:.85rem;font-weight:800;letter-spacing:.04em;color:#fff;background:var(--c);border-radius:6px;padding:1px 8px;margin-right:8px}
 .vm-check{font-size:1.05rem;line-height:1.7;color:inherit}
 .vm-warn{background:#fff6df;color:#191919;border:1px solid #f2a600;border-radius:12px;padding:10px 16px;font-size:1.05rem}
-#convene-btn,#sign-btn{font-size:1.2rem !important;min-height:56px}
+/* ---- 3D colour buttons ---- */
+.vm-tiles{gap:26px !important;margin:6px 4px 30px !important;perspective:1200px}
+button.vm-tile,.vm-tile button{min-height:150px;border-radius:22px !important;border:none !important;color:#fff !important;
+  font-size:1.32rem !important;font-weight:750 !important;line-height:1.45 !important;white-space:pre-line !important;text-align:left !important;
+  justify-content:flex-start !important;padding:22px 26px !important;text-shadow:0 2px 3px rgba(0,0,0,.35);
+  background:linear-gradient(150deg,var(--hi),var(--base) 55%,var(--lo)) !important;
+  box-shadow:0 12px 0 var(--edge),0 26px 34px rgba(0,0,0,.28),inset 0 3px 0 rgba(255,255,255,.45),inset 0 -6px 12px rgba(0,0,0,.18) !important;
+  transform:rotateX(8deg) translateY(0);transform-origin:50% 100%;transition:transform .16s ease,box-shadow .16s ease,filter .16s ease !important}
+button.vm-tile:hover,.vm-tile button:hover{transform:rotateX(0deg) translateY(-6px);filter:brightness(1.07);
+  box-shadow:0 16px 0 var(--edge),0 34px 40px rgba(0,0,0,.30),inset 0 3px 0 rgba(255,255,255,.5),inset 0 -6px 12px rgba(0,0,0,.18) !important}
+button.vm-tile:active,.vm-tile button:active{transform:rotateX(0deg) translateY(10px);
+  box-shadow:0 2px 0 var(--edge),0 6px 10px rgba(0,0,0,.3),inset 0 3px 8px rgba(0,0,0,.25) !important}
+.t1{--hi:#35d0ba;--base:#0f9d8a;--lo:#0b7f70;--edge:#075a50}
+.t2{--hi:#6ea2ff;--base:#2f6fde;--lo:#2459b8;--edge:#183f86}
+.t3{--hi:#ffab52;--base:#d9730d;--lo:#b55f09;--edge:#834405}
+.t4{--hi:#a98bf5;--base:#7b4fd6;--lo:#6540b6;--edge:#462a85}
+.t5{--hi:#f47aa9;--base:#d6457f;--lo:#b43568;--edge:#822148}
+.t6{--hi:#63cf78;--base:#2e9e44;--lo:#258238;--edge:#175a25}
+button.vm-wide,.vm-wide button{min-height:84px !important;text-align:center !important;justify-content:center !important;margin:18px 4px 26px !important}
+button.vm-home,.vm-home button{border-radius:14px !important;border:none !important;color:#fff !important;font-weight:700 !important;
+  min-width:150px !important;background:linear-gradient(150deg,#56657f,#2f3b52) !important;
+  box-shadow:0 6px 0 #1b2333,0 12px 16px rgba(0,0,0,.25),inset 0 2px 0 rgba(255,255,255,.3) !important;transition:transform .12s ease,box-shadow .12s ease !important}
+button.vm-home:active,.vm-home button:active{transform:translateY(5px);box-shadow:0 1px 0 #1b2333,0 3px 6px rgba(0,0,0,.3) !important}
+/* ---- meeting ---- */
+.vm-talk{max-height:560px;overflow-y:auto;background:#f3f5f9;border:1px solid #d5dbe5;border-radius:14px;padding:12px;}
+.vm-msg{display:flex;gap:10px;margin:8px 0;align-items:flex-start}
+.vm-msg.you{flex-direction:row-reverse}
+.vm-av{flex:0 0 40px;height:40px;border-radius:50%;color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;
+  box-shadow:inset -4px -4px 8px rgba(0,0,0,.3),0 3px 6px rgba(0,0,0,.25)}
+.vm-bub{background:#fff;color:#191919;border-radius:14px;padding:10px 14px;font-size:1.05rem;line-height:1.45;max-width:86%;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.vm-msg.you .vm-bub{background:#dff5f0}
+.vm-who{font-weight:750;font-size:.95rem;margin-bottom:2px}
+.vm-seat{background:#fff;color:#191919;border:1px solid #d9d9d9;border-radius:10px;padding:8px 12px;margin:6px 0;font-size:1.03rem}
+.vm-dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px}
+.vm-final{border-radius:16px;padding:20px 24px;background:linear-gradient(160deg,#eaf7ec,#dff5f0);border:2px solid #2e9e44;color:#191919;margin-top:8px}
+.vm-final .big{font-size:1.5rem;font-weight:800}.vm-final .rx{font-size:1.6rem;font-weight:800;margin:8px 0;color:#175a25}
+.vm-final .line{font-size:1.08rem;margin-top:5px}
 .vm-chip{display:inline-block;background:#eaf2fd;color:#191919;border:1px solid #9ec0ee;border-radius:999px;padding:2px 12px;margin:4px 6px 0 0;font-size:1rem}
 .vm-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:1.02rem !important}
 .vm-table th{text-align:left;background:#22304a;color:#fff;padding:8px 10px;font-size:.98rem}
@@ -157,6 +193,64 @@ def med_review_html(res) -> str:
             "product information. 'No clash found' means none in this list.</p>")
 
 
+PAGES = ["home", "request", "meeting", "list", "data", "assurance", "log", "about"]
+# Runs in the browser before a page change. It must hand the inputs back unchanged.
+SCROLL_TOP = "(...args) => { window.scrollTo({top: 0, behavior: 'smooth'}); return args; }"
+
+
+HIDE = False   # a page that is not the current one is taken off the screen entirely
+
+
+def nav(page: str):
+    """Show one page and hide the rest (each feature has its own page)."""
+    return [gr.update(visible=True if p == page else HIDE) for p in PAGES]
+
+
+def say(transcript, who: dict, text: str, you: bool = False):
+    return (transcript or []) + [{"name": who["name"], "colour": who["colour"], "text": text, "you": you}]
+
+
+YOU = {"name": "You (prescriber)", "colour": "#0f766e"}
+
+
+def transcript_html(transcript) -> str:
+    if not transcript:
+        return "<div class='vm-talk'><div class='vm-check'>The meeting has not started.</div></div>"
+    rows = ""
+    for m in reversed(transcript):          # newest first, so the latest answer is always in view
+        side = "you" if m["you"] else "them"
+        rows += (f"<div class='vm-msg {side}'><div class='vm-av' style='background:{m['colour']}'>{escape(m['name'][0])}</div>"
+                 f"<div class='vm-bub'><div class='vm-who' style='color:{m['colour']}'>{escape(m['name'])}</div>{escape(m['text'])}</div></div>")
+    return f"<div class='vm-talk' id='vm-talk'>{rows}</div>"
+
+
+def board_html(res) -> str:
+    """Where each expert stands, and the team's overall position."""
+    col = {RED: ("#dc3c3d", "#fdecec"), AMBER: ("#b77900", "#fff6df"), INFO: ("#008a17", "#eaf7ec")}
+    cells = ""
+    for p in meeting.positions(res):
+        c, bg = col[p["level"]]
+        cells += (f"<div class='vm-seat'><span class='vm-dot' style='background:{p['colour']}'></span><b>{escape(p['name'])}</b>"
+                  f"<span class='vm-pill' style='background:{bg};color:{c};border:1px solid {c};float:right'>{escape(p['position'])}</span></div>")
+    return (f"<h3>Where the team stands</h3><div class='vm-check'><b>{escape(meeting.tally(res))}</b></div>{cells}")
+
+
+def _meeting_outputs(res, when, transcript):
+    humans = [f"{c['name']}: {c['note']}" for c in res.convened if c["human"]]
+    escalated = res.outcome in ("RED", "HARD_STOP")
+    allowed = [v for k, v in DECISIONS.items() if (k in ("ACCEPT_ALTERNATIVE", "OVERRIDE", "REJECT") if escalated
+                                                    else k in ("APPROVE", "APPROVE_WITH_CHANGES", "REJECT"))]
+    if escalated and not res.alternative:
+        allowed.remove(DECISIONS["ACCEPT_ALTERNATIVE"])
+    names = [c["name"] for c in res.convened]
+    pr = res.patient.proposal
+    return (res, when, transcript, banner(res), room3d.render(res, when.strftime("%a %d %b %Y, %H:%M")), transcript_html(transcript),
+            board_html(res), med_review_html(res) + findings_html(res),
+            gr.update(choices=names, value=names[0]), gr.update(choices=allowed, value=None), gr.update(choices=humans, value=[]),
+            gr.update(visible=res.outcome == "AMBER", value=False),
+            pr.drug, pr.dose, pr.frequency, pr.duration_days, gr.update(visible=bool(res.alternative_proposal)), "", None)
+
+
 def convene_click(time_mode, custom_time, live, delay, *fields):
     try:
         p = build_patient(*fields)
@@ -171,25 +265,95 @@ def convene_click(time_mode, custom_time, live, delay, *fields):
         except ValueError:
             raise gr.Error("Write the time like this: 2026-11-28 02:30")
     res = run_case(p, when=when, live_evidence=bool(live), demo_delay=bool(delay))
-    humans = [f"{c['name']}: {c['note']}" for c in res.convened if c["human"]]
-    escalated = res.outcome in ("RED", "HARD_STOP")
-    allowed = [v for k, v in DECISIONS.items() if (k in ("ACCEPT_ALTERNATIVE", "OVERRIDE", "REJECT") if escalated
-                                                    else k in ("APPROVE", "APPROVE_WITH_CHANGES", "REJECT"))]
-    if escalated and not res.alternative:
-        allowed.remove(DECISIONS["ACCEPT_ALTERNATIVE"])
-    return (res, banner(res), room3d.render(res, when.strftime("%a %d %b %Y, %H:%M")), med_review_html(res) + findings_html(res),
-            gr.update(choices=allowed, value=None), gr.update(choices=humans, value=[]),
-            gr.update(visible=res.outcome == "AMBER", value=False), "")
+    transcript = say([], meeting.CHAIR, meeting.chair_opening(res))
+    return _meeting_outputs(res, when, transcript) + tuple(nav("meeting"))
 
 
-def sign_click(res, log, clinician, role, decision_label, ack, changes, reason, advice):
+def _expert(res, name):
+    return next((c for c in res.convened if c["name"] == name), None)
+
+
+def ask_click(res, transcript, name, question):
+    if res is None:
+        raise gr.Error("Convene the virtual team first.")
+    who = _expert(res, name)
+    if who is None or not question:
+        raise gr.Error("Choose an expert and a question.")
+    transcript = say(transcript, YOU, f"{name}: {question}", you=True)
+    transcript = say(transcript, who, meeting.answer(res, who["agent"], question))
+    return transcript, transcript_html(transcript)
+
+
+def round_click(res, transcript):
+    if res is None:
+        raise gr.Error("Convene the virtual team first.")
+    transcript = say(transcript, YOU, "Can we go round the table? Where does each of you stand?", you=True)
+    for p, text in meeting.round_table(res):
+        transcript = say(transcript, p, text)
+    transcript = say(transcript, meeting.CHAIR, f"That is {meeting.tally(res)}. {res.headline}")
+    return transcript, transcript_html(transcript)
+
+
+def whatif_click(res, when, transcript, drug, dose, freq, days):
+    if res is None:
+        raise gr.Error("Convene the virtual team first.")
+    if not (drug or "").strip():
+        raise gr.Error("Enter the medicine to try.")
+    transcript = say(transcript, YOU, f"What if I prescribe {drug} {dose}, {freq}" + (f", for {int(days)} days" if days else "") + "?", you=True)
+    new, text = meeting.what_if(res, drug, dose, freq, days, when=when)
+    transcript = say(transcript, meeting.CHAIR, text)
+    return _meeting_outputs(new, when, transcript)
+
+
+def safer_click(res, when, transcript):
+    if res is None or not res.alternative_proposal:
+        raise gr.Error("No safer option is on the table for this request.")
+    alt = res.alternative_proposal
+    return whatif_click(res, when, transcript, alt["drug"], alt["dose"], alt["frequency"], alt["duration_days"])
+
+
+def conclusion_html(c: dict) -> str:
+    li = lambda xs: "".join(f"<li>{escape(x)}</li>" for x in xs)
+    extra = ""
+    if c["reason"]:
+        extra += f"<div class='line'><b>Reason recorded:</b> {escape(c['reason'])}</div>"
+    if c["stops"]:
+        extra += f"<div class='line'><b>Objections raised:</b><ul>{li(c['stops'])}</ul></div>"
+    if c["cautions"]:
+        extra += f"<div class='line'><b>Cautions to act on:</b><ul>{li(c['cautions'])}</ul></div>"
+    if c["tell_patient"]:
+        extra += f"<div class='line'><b>Side effects to mention to the patient:</b> {escape(', '.join(c['tell_patient']))}</div>"
+    if c["human_advice"]:
+        extra += f"<div class='line'><b>Human advice requested from:</b> {escape('; '.join(c['human_advice']))}</div>"
+    return (f"<div class='vm-final'><div class='big'>Final conclusion of the meeting</div>"
+            f"<div class='rx'>{escape(c['final_prescription'])}</div>"
+            f"<div class='line'><b>Decision:</b> {escape(c['decision'])} · <b>Decided by:</b> {escape(c['decided_by'])} · {escape(c['time_utc'])} UTC</div>"
+            f"<div class='line'><b>Team position at close:</b> {escape(c['team'])}</div>{extra}"
+            f"<div class='line' style='font-size:.9rem'>Decision log record {escape(c['log_record'])} · case {escape(c['case'])}</div></div>")
+
+
+def sign_click(res, log, transcript, clinician, role, decision_label, ack, changes, reason, advice):
     if res is None:
         raise gr.Error("Convene the virtual team first.")
     log = log or AuditLog()
     key = next((k for k, v in DECISIONS.items() if v == decision_label), "")
-    ok, msg, _ = sign_off(res, key, clinician, role, log, reason=reason, changes=changes, acknowledged=bool(ack), human_advice=advice)
-    box = f"<div class='vm-banner' style='--c:{'#0aac23' if ok else '#dc3c3d'};--bg:{'#eaf7ec' if ok else '#fdecec'}'><div class='line'>{escape(msg)}</div></div>"
-    return log, box, audit_table(log), audit_file(log)
+    ok, msg, rec = sign_off(res, key, clinician, role, log, reason=reason, changes=changes, acknowledged=bool(ack), human_advice=advice)
+    if not ok:
+        box = f"<div class='vm-banner' style='--c:#dc3c3d;--bg:#fdecec'><div class='line'>{escape(msg)}</div></div>"
+        return log, transcript, transcript_html(transcript), box, None, audit_table(log), audit_file(log), log_status(log)
+    c = meeting.conclusion(res, rec, role)
+    transcript = say(transcript, YOU, f"My decision: {decision_label}.", you=True)
+    transcript = say(transcript, meeting.CHAIR, f"Recorded. Final prescription: {c['final_prescription']}. The meeting is closed.")
+    path = os.path.join(tempfile.mkdtemp(), "vmdt_meeting_conclusion.txt")
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(meeting.conclusion_text(c))
+    return log, transcript, transcript_html(transcript), conclusion_html(c), path, audit_table(log), audit_file(log), log_status(log)
+
+
+def log_status(log) -> str:
+    if not log or not log.records:
+        return "No decisions recorded in this session yet."
+    return f"**{len(log.records)} decision(s) recorded.** Chain check: {'intact' if log.verify() else 'BROKEN - the log has been altered'}."
 
 
 def audit_table(log) -> pd.DataFrame:
@@ -310,7 +474,9 @@ request, runs all the experts at the same moment, and hands the prescriber a che
 ## What is new compared with the paper
 1. **The team changes with the case.** Six core experts always attend, including a side-effect check. A microbiologist, urologist, diabetologist, oncologist,
    kidney physician or geriatrician is called in only when the case needs them.
-2. **A 3D consulting room with an availability rota.** Each expert shows whether its human counterpart can be reached right now,
+2. **An interactive meeting.** After the review you can question any expert, go round the table, put a changed prescription
+   to the team and see who changes position, then close the meeting with a written conclusion.
+3. **A 3D consulting room with an availability rota.** Each expert shows whether its human counterpart can be reached right now,
    and the prescriber can log a request for human advice.
 3. **A stronger human-in-the-loop step.** Nothing is issued without a named clinician's decision. An escalated case cannot simply be
    approved: the clinician picks the safer option, declines, or overrides with a written reason.
@@ -321,7 +487,7 @@ request, runs all the experts at the same moment, and hands the prescriber a che
    when the lab test found no infection; repeated clear tests point the prescriber towards inflammation instead. Total days of
    antibiotics over 12 months are counted, with a warning for heavy exposure and long-term nitrofurantoin.
 7. **Whole-list review.** A practice list can be reviewed in one run, and live NHS open data shows what is actually being prescribed.
-8. **Built with a software engineering method.** Twenty-one requirements traced to tests, ten acceptance targets, a release gate and a
+8. **Built with a software engineering method.** Twenty-two requirements traced to tests, ten acceptance targets, a release gate and a
    tamper-evident log (the same approach as UroAgent).
 
 ## Limits you must know
@@ -353,6 +519,16 @@ def _theme():
 _THEME_IN_LAUNCH = "theme" in inspect.signature(gr.Blocks.launch).parameters
 
 
+TILES = [  # (page, label, colour class)
+    ("request", "🩺  Convene the virtual MDT\nEnter a prescription and meet the experts", "t1"),
+    ("list", "📋  Review a patient list\nCheck many prescriptions in one run", "t2"),
+    ("data", "📈  What is being prescribed\nLive NHS prescribing figures", "t3"),
+    ("assurance", "🛠️  Engineering and assurance\nRequirements, tests and targets", "t4"),
+    ("log", "🔏  Decision log\nEvery decision, tamper-evident", "t5"),
+    ("about", "ℹ️  About and limits\nWhat is new, and what it cannot do", "t6"),
+]
+
+
 def build() -> gr.Blocks:
     extra = {} if _THEME_IN_LAUNCH else {"theme": _theme(), "css": CSS}
     with gr.Blocks(title="VirtualMDT-Rx", **extra) as demo:
@@ -360,25 +536,36 @@ def build() -> gr.Blocks:
         gr.HTML("<div class='vm-warn'><b>Research demonstrator on invented data. Not a medical device.</b> "
                 "Do not enter real patient details. The rules shown are a small illustrative set, not the BNF or NICE guidance. "
                 "A qualified clinician makes every prescribing decision.</div>")
-        state, log_state = gr.State(None), gr.State(None)
+        state, log_state, when_state, talk_state = gr.State(None), gr.State(None), gr.State(None), gr.State([])
+        homes = []
 
-        with gr.Tab("1 · Consult the virtual team"):
+        def home_button():
+            b = gr.Button("⬅  Home", elem_classes=["vm-home"], scale=0)
+            homes.append(b)
+            return b
+
+        # ------------------------------------------------------------ HOME
+        with gr.Column(visible=True, elem_classes=["vm-page"]) as pg_home:
+            gr.Markdown("### Choose what you want to do")
+            tiles = {}
+            for row in (TILES[:3], TILES[3:]):
+                with gr.Row(elem_classes=["vm-tiles"]):
+                    for page, label, cls in row:
+                        tiles[page] = gr.Button(label, elem_classes=["vm-tile", cls])
+
+        # --------------------------------------------------------- REQUEST
+        with gr.Column(visible=HIDE, elem_classes=["vm-page"]) as pg_request:
             with gr.Row():
-                with gr.Column(scale=5, min_width=380):
-                    gr.Markdown("### The prescribing request")
-                    with gr.Row():
-                        preset = gr.Dropdown(list(PRESETS), label="Try an example case", value=None, scale=4)
+                home_button()
+                gr.Markdown("## Step 1 of 2 · The prescribing request")
+            preset = gr.Dropdown(list(PRESETS), label="Try an example case", value=None)
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("### The patient")
                     with gr.Row():
                         ref = gr.Textbox(label="Case reference (no names)", value="CASE-001")
                         age = gr.Number(label="Age", value=60, precision=0)
                         sex = gr.Radio(["female", "male"], label="Sex", value="female")
-                    with gr.Row():
-                        indication = gr.Dropdown(list(INDICATIONS), label="Treating", value="Urine infection (UTI)")
-                        drug = gr.Dropdown(sorted(kb.DRUGS), label="Medicine to prescribe", allow_custom_value=True, value="nitrofurantoin")
-                    with gr.Row():
-                        dose = gr.Textbox(label="Dose", value="100 mg modified-release")
-                        freq = gr.Dropdown(FREQS, label="How often", value="twice daily")
-                        days = gr.Number(label="Days (blank = ongoing)", value=3, precision=0)
                     with gr.Row():
                         egfr = gr.Number(label="Kidney function (eGFR)", value=90)
                         pregnant = gr.Checkbox(label="Pregnant")
@@ -389,51 +576,85 @@ def build() -> gr.Blocks:
                     with gr.Row():
                         allergies = gr.Textbox(label="Allergies, as substance:reaction", placeholder="penicillin:anaphylaxis", scale=3)
                         allergy_rec = gr.Checkbox(label="Allergy status recorded", value=True)
-                    function = gr.CheckboxGroup(list(FUNCTION_FLAGS), label="Day-to-day function")
-                    with gr.Accordion("Infection tests and antibiotic history", open=True):
-                        culture = gr.Dropdown(CULTURE_CHOICES, label="Latest urine lab test (culture)", value="not recorded")
-                        with gr.Row():
-                            clear_tests = gr.Number(label="Lab tests in 12 months that found NO infection", value=0, precision=0)
-                            abx_days = gr.Number(label="Total days of antibiotics in 12 months", value=0, precision=0)
-                        with gr.Row():
-                            courses = gr.Number(label="Antibiotic courses for UTI in 6 months", value=0, precision=0)
-                            missed = gr.Number(label="Prescriptions not collected recently", value=0, precision=0)
-                        resistant = gr.Textbox(label="Recent culture resistant to (separate with ;)")
+                    function = gr.CheckboxGroup(list(FUNCTION_FLAGS), label="Day-to-day function", value=[])
+                with gr.Column():
+                    gr.Markdown("### The medicine you want to prescribe")
+                    with gr.Row():
+                        indication = gr.Dropdown(list(INDICATIONS), label="Treating", value="Urine infection (UTI)")
+                        drug = gr.Dropdown(sorted(kb.DRUGS), label="Medicine to prescribe", allow_custom_value=True, value="nitrofurantoin")
+                    with gr.Row():
+                        dose = gr.Textbox(label="Dose", value="100 mg modified-release")
+                        freq = gr.Dropdown(FREQS, label="How often", value="twice daily")
+                        days = gr.Number(label="Days (blank = ongoing)", value=3, precision=0)
+                    gr.Markdown("### Infection tests and antibiotic history")
+                    culture = gr.Dropdown(CULTURE_CHOICES, label="Latest urine lab test (culture)", value="not recorded")
+                    with gr.Row():
+                        clear_tests = gr.Number(label="Lab tests in 12 months that found NO infection", value=0, precision=0)
+                        abx_days = gr.Number(label="Total days of antibiotics in 12 months", value=0, precision=0)
+                    with gr.Row():
+                        courses = gr.Number(label="Antibiotic courses for UTI in 6 months", value=0, precision=0)
+                        missed = gr.Number(label="Prescriptions not collected recently", value=0, precision=0)
+                    resistant = gr.Textbox(label="Recent culture resistant to (separate with ;)")
                     notes = gr.Textbox(label="Free-text notes (screened for warning phrases)", lines=2)
                     with gr.Accordion("Time of consultation and options", open=False):
                         time_mode = gr.Radio(["Now", "Choose a time"], label="Show expert availability for", value="Now")
                         custom_time = gr.Textbox(label="Time (YYYY-MM-DD HH:MM)", value="2026-11-28 02:30")
                         live = gr.Checkbox(label="Search PubMed for recent safety papers (sends the medicine and condition names only)")
                         delay = gr.Checkbox(label="Add made-up 'thinking time' to each expert, to show the benefit of working in parallel")
-                    go = gr.Button("Convene the virtual team", variant="primary", elem_id="convene-btn")
-                with gr.Column(scale=7, min_width=480):
-                    out_banner = gr.HTML()
-                    out_room = gr.HTML(room3d.empty_room())
-                    out_findings = gr.HTML()
-                    gr.Markdown("### Your decision (human in the loop)")
-                    with gr.Row():
-                        clinician = gr.Textbox(label="Your clinician ID or initials")
-                        role = gr.Radio(["GP", "Consultant", "Prescribing pharmacist", "Nurse prescriber"], label="Role", value="GP")
-                    decision = gr.Radio([], label="Decision")
-                    ack = gr.Checkbox(label="I have read the cautions above", visible=False)
-                    changes = gr.Textbox(label="If approving with changes: the prescription as you want it")
-                    reason = gr.Textbox(label="Reason (required for an override)")
-                    advice = gr.CheckboxGroup([], label="Also log a request for human advice from")
-                    sign = gr.Button("Record my decision", variant="primary", elem_id="sign-btn")
-                    sign_msg = gr.HTML()
-                    audit_df = gr.Dataframe(label="Decision log for this session (tamper-evident)", interactive=False)
-                    audit_dl = gr.File(label="Download the decision log")
-            inputs = [ref, age, sex, egfr, pregnant, trimester, indication, drug, dose, freq, days, meds, conds, allergies,
-                      allergy_rec, function, courses, resistant, missed, notes, culture, clear_tests, abx_days]
-            preset.change(load_preset, preset, inputs)
-            go.click(convene_click, [time_mode, custom_time, live, delay] + inputs,
-                     [state, out_banner, out_room, out_findings, decision, advice, ack, sign_msg])
-            sign.click(sign_click, [state, log_state, clinician, role, decision, ack, changes, reason, advice],
-                       [log_state, sign_msg, audit_df, audit_dl])
+            go = gr.Button("🩺  Convene the virtual MDT  ➜  open the meeting room", elem_classes=["vm-tile", "t1", "vm-wide"], elem_id="convene-btn")
 
-        with gr.Tab("2 · Review a patient list"):
-            gr.Markdown("### Review many prescribing requests in one run\nUpload a CSV of current and proposed medicines, or use the built-in "
-                        "list of invented patients. Column names are listed in the README. **Do not upload identifiable patient data.**")
+        # --------------------------------------------------------- MEETING
+        with gr.Column(visible=HIDE, elem_classes=["vm-page"]) as pg_meeting:
+            with gr.Row():
+                home_button()
+                back_req = gr.Button("✏️  Change the request", elem_classes=["vm-home"], scale=0)
+                gr.Markdown("## Step 2 of 2 · The virtual MDT meeting")
+            out_banner = gr.HTML()
+            out_room = gr.HTML(room3d.empty_room())
+            with gr.Row():
+                with gr.Column(scale=6, min_width=420):
+                    gr.Markdown("### Talk to the team")
+                    who = gr.Radio([], label="Speak to")
+                    question = gr.Radio(meeting.QUESTIONS, label="Ask", value=meeting.QUESTIONS[0])
+                    with gr.Row():
+                        ask = gr.Button("Ask this expert", variant="primary")
+                        around = gr.Button("Go round the table")
+                    out_talk = gr.HTML()
+                with gr.Column(scale=6, min_width=420):
+                    out_board = gr.HTML()
+                    gr.Markdown("### Put a change to the team")
+                    with gr.Row():
+                        w_drug = gr.Dropdown(sorted(kb.DRUGS), label="Medicine", allow_custom_value=True)
+                        w_dose = gr.Textbox(label="Dose")
+                    with gr.Row():
+                        w_freq = gr.Dropdown(FREQS, label="How often")
+                        w_days = gr.Number(label="Days (blank = ongoing)", precision=0)
+                    with gr.Row():
+                        w_go = gr.Button("Ask the team to review this change", variant="primary")
+                        w_safer = gr.Button("Try the team's safer option", visible=False)
+            with gr.Accordion("Full details: check against each existing medicine, side effects, dose and every finding", open=False):
+                out_findings = gr.HTML()
+            gr.Markdown("### Close the meeting: your decision (human in the loop)")
+            with gr.Row():
+                clinician = gr.Textbox(label="Your clinician ID or initials")
+                role = gr.Radio(["GP", "Consultant", "Prescribing pharmacist", "Nurse prescriber"], label="Role", value="GP")
+            decision = gr.Radio([], label="Decision")
+            ack = gr.Checkbox(label="I have read the cautions above", visible=False)
+            with gr.Row():
+                changes = gr.Textbox(label="If approving with changes: the prescription as you want it")
+                reason = gr.Textbox(label="Reason (required for an override)")
+            advice = gr.CheckboxGroup([], label="Also log a request for human advice from", value=[])
+            sign = gr.Button("✅  Record my decision and close the meeting", elem_classes=["vm-tile", "t6", "vm-wide"], elem_id="sign-btn")
+            out_final = gr.HTML()
+            final_dl = gr.File(label="Download the written conclusion")
+
+        # ------------------------------------------------------------ LIST
+        with gr.Column(visible=HIDE, elem_classes=["vm-page"]) as pg_list:
+            with gr.Row():
+                home_button()
+                gr.Markdown("## Review a patient list")
+            gr.Markdown("Upload a CSV of current and proposed medicines, or use the built-in list of invented patients. "
+                        "Column names are listed in the README. **Do not upload identifiable patient data.**")
             with gr.Row():
                 up = gr.File(label="CSV file", file_types=[".csv"], type="filepath")
                 synth = gr.Checkbox(label="Use the 200 invented patients instead", value=True)
@@ -445,9 +666,13 @@ def build() -> gr.Blocks:
             b_dl = gr.File(label="Download the results")
             run_b.click(batch_run, [up, synth], [b_sum, b_plot, b_top, b_tab, b_dl])
 
-        with gr.Tab("3 · What is being prescribed"):
-            gr.Markdown("### Live NHS prescribing data\nMonthly counts of items prescribed in English general practice, from "
-                        "OpenPrescribing.net (built on NHS Business Services Authority data). No patient-level data is involved. Needs internet access.")
+        # ------------------------------------------------------------ DATA
+        with gr.Column(visible=HIDE, elem_classes=["vm-page"]) as pg_data:
+            with gr.Row():
+                home_button()
+                gr.Markdown("## What is being prescribed")
+            gr.Markdown("Monthly counts of items prescribed in English general practice, from OpenPrescribing.net "
+                        "(built on NHS Business Services Authority data). No patient-level data is involved. Needs internet access.")
             with gr.Row():
                 t_ind = gr.Dropdown([k for k in INDICATIONS if k != "Other"], label="Medicine group", value="Urine infection (UTI)")
                 t_go = gr.Button("Fetch the latest figures", variant="primary")
@@ -456,9 +681,13 @@ def build() -> gr.Blocks:
             t_tab = gr.Dataframe(label="Latest month compared with a year earlier (table view of the chart)", interactive=False, wrap=True)
             t_go.click(trends, t_ind, [t_msg, t_plot, t_tab])
 
-        with gr.Tab("4 · Engineering and assurance"):
-            gr.Markdown("### Our software engineering approach, applied\nNine principles, a V-model that pairs every requirement with a test, "
-                        "and a release gate: the tool may not be released if any target fails.")
+        # ------------------------------------------------------- ASSURANCE
+        with gr.Column(visible=HIDE, elem_classes=["vm-page"]) as pg_assurance:
+            with gr.Row():
+                home_button()
+                gr.Markdown("## Engineering and assurance")
+            gr.Markdown("Nine principles, a V-model that pairs every requirement with a test, and a release gate: "
+                        "the tool may not be released if any target fails.")
             gr.Dataframe(PRINCIPLES, interactive=False, wrap=True, label="Nine principles for healthcare AI agents")
             e_go = gr.Button("Run the 10 acceptance targets now", variant="primary")
             e_gate = gr.Markdown()
@@ -470,8 +699,44 @@ def build() -> gr.Blocks:
             gr.Markdown("**Honest limit:** the cases and the rules were written by the same team, so a perfect score shows the controls "
                         "work as designed, not that the tool is clinically accurate. Independent cases and real, anonymised data come next.")
 
-        with gr.Tab("5 · About and limits"):
+        # ------------------------------------------------------------- LOG
+        with gr.Column(visible=HIDE, elem_classes=["vm-page"]) as pg_log:
+            with gr.Row():
+                home_button()
+                gr.Markdown("## Decision log")
+            gr.Markdown("Every decision recorded in this session. Each record carries the fingerprint of the one before it, so a change "
+                        "to any earlier record is detected. Patient and clinician references are stored only as scrambled codes.")
+            log_msg = gr.Markdown("No decisions recorded in this session yet.")
+            audit_df = gr.Dataframe(label="Decisions in this session", interactive=False)
+            audit_dl = gr.File(label="Download the decision log")
+
+        # ----------------------------------------------------------- ABOUT
+        with gr.Column(visible=HIDE, elem_classes=["vm-page"]) as pg_about:
+            with gr.Row():
+                home_button()
+                gr.Markdown("## About and limits")
             gr.Markdown(ABOUT)
+
+        # ---------------------------------------------------------- wiring
+        pages = [pg_home, pg_request, pg_meeting, pg_list, pg_data, pg_assurance, pg_log, pg_about]
+        for page, btn in tiles.items():
+            btn.click(lambda page=page: nav(page), None, pages, js=SCROLL_TOP)
+        for b in homes:
+            b.click(lambda: nav("home"), None, pages, js=SCROLL_TOP)
+        back_req.click(lambda: nav("request"), None, pages, js=SCROLL_TOP)
+
+        inputs = [ref, age, sex, egfr, pregnant, trimester, indication, drug, dose, freq, days, meds, conds, allergies,
+                  allergy_rec, function, courses, resistant, missed, notes, culture, clear_tests, abx_days]
+        preset.change(load_preset, preset, inputs)
+        meeting_out = [state, when_state, talk_state, out_banner, out_room, out_talk, out_board, out_findings, who, decision,
+                       advice, ack, w_drug, w_dose, w_freq, w_days, w_safer, out_final, final_dl]
+        go.click(convene_click, [time_mode, custom_time, live, delay] + inputs, meeting_out + pages, js=SCROLL_TOP)
+        ask.click(ask_click, [state, talk_state, who, question], [talk_state, out_talk])
+        around.click(round_click, [state, talk_state], [talk_state, out_talk])
+        w_go.click(whatif_click, [state, when_state, talk_state, w_drug, w_dose, w_freq, w_days], meeting_out)
+        w_safer.click(safer_click, [state, when_state, talk_state], meeting_out)
+        sign.click(sign_click, [state, log_state, talk_state, clinician, role, decision, ack, changes, reason, advice],
+                   [log_state, talk_state, out_talk, out_final, final_dl, audit_df, audit_dl, log_msg])
     return demo
 
 

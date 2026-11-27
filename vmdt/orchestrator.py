@@ -229,7 +229,7 @@ def run_case(p: Patient, when: Optional[datetime] = None, live_evidence: bool = 
     escalate = [f for f in reds if f.signal in ESCALATION_SIGNALS]
     critical_down = bool(set(failed) & CRITICAL_AGENTS)
     optimisation = optimise(p)
-    draft, alternative = None, None
+    draft, alternative, alt = None, None, None
     if escalate or critical_down:
         outcome = RED
         only_red_flags = any(f.signal == "red_flag" for f in escalate)  # a red flag outranks any drug swap
@@ -267,7 +267,8 @@ def run_case(p: Patient, when: Optional[datetime] = None, live_evidence: bool = 
                       triage_signals=signals, optimisation=optimisation, safety_check=safety, draft=draft,
                       alternative=alternative, total_ms=(time.perf_counter() - t0) * 1000,
                       sequential_ms=sum(r.ms for r in reports), convened=convened,
-                      case_hash=hashlib.sha256(canon.encode()).hexdigest())
+                      case_hash=hashlib.sha256(canon.encode()).hexdigest(),
+                      alternative_proposal=alt if alternative else None)
 
 
 # ------------------------------------------------------------ human sign-off

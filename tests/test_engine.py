@@ -267,6 +267,48 @@ def test_antibiotic_exposure():
     assert not any(f.code in ("MB-013", "MB-014") for f in run_case(light).findings)
 
 
+def test_meeting_interaction():
+    from vmdt import meeting
+    r = run_case(case("UTI-02"))                               # nitrofurantoin with poor kidney function
+    pos = {p["agent"]: p["position"] for p in meeting.positions(r)}
+    assert pos["pharmacist"] == "Objects" and pos["allergy"] == "Agrees"
+    assert "1 object" in meeting.tally(r) and "safer option" in meeting.chair_opening(r)
+    for c in r.convened:                                       # every expert answers every question
+        for q in meeting.QUESTIONS:
+            assert len(meeting.answer(r, c["agent"], q)) > 20
+    assert "object" in meeting.answer(r, "pharmacist", meeting.QUESTIONS[1]).lower()
+    assert "support" in meeting.answer(r, "allergy", meeting.QUESTIONS[1]).lower()
+    assert "feeling or being sick" in meeting.answer(r, "side_effects", meeting.QUESTIONS[2])
+    assert "not called in" in meeting.answer(r, "oncology", meeting.QUESTIONS[0])
+    assert len(meeting.round_table(r)) == len(r.convened)
+
+
+def test_meeting_what_if():
+    from vmdt import meeting
+    r = run_case(case("UTI-02"))
+    assert r.alternative_proposal and r.alternative_proposal["drug"] == "trimethoprim"
+    alt = r.alternative_proposal
+    new, text = meeting.what_if(r, alt["drug"], alt["dose"], alt["frequency"], alt["duration_days"])
+    assert new.outcome in ("GREEN", "AMBER") and new.draft          # the team now accepts it
+    assert "Pharmacist: objects -> " in text
+    worse, text2 = meeting.what_if(r, "nitrofurantoin", "200 mg", "four times daily", 3)
+    assert worse.outcome == "RED" and any(f.code == "DO-001" for f in worse.findings)
+    assert r.patient.proposal.drug == "nitrofurantoin" and r.patient.proposal.dose.startswith("100")   # original untouched
+
+
+def test_meeting_conclusion_needs_a_decision():
+    from vmdt import meeting
+    r = run_case(case("UTI-02"))
+    log = AuditLog()
+    ok, _, rec = sign_off(r, "APPROVE", "GP7", "GP", log)
+    assert not ok and rec is None                                   # no decision, so no conclusion can be written
+    ok, _, rec = sign_off(r, "ACCEPT_ALTERNATIVE", "GP7", "GP", log)
+    c = meeting.conclusion(r, rec, "GP")
+    assert ok and c["final_prescription"].lower().startswith("trimethoprim") and c["stops"]
+    text = meeting.conclusion_text(c)
+    assert "FINAL CONCLUSION" in text and "GP7" not in text and rec["hash"][:16] in text
+
+
 def test_open_data_parsing(monkeypatch):
     """The live NHS data path, exercised with a canned reply (no internet needed)."""
     rows = [{"type": "chemical", "id": "0501130R0", "name": "Nitrofurantoin"},

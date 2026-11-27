@@ -47,4 +47,6 @@ REQUIREMENTS = [
      "principle": "9 Ethics by design", "tests": ["test_no_antibiotic_without_infection"]},
     {"id": "REQ-21", "goal": "Safety", "text": "Total antibiotic exposure over 12 months is counted and heavy exposure or long-term nitrofurantoin is flagged with the monitoring needed.",
      "principle": "1 Testable requirements", "tests": ["test_antibiotic_exposure"]},
+    {"id": "REQ-22", "goal": "Human control", "text": "In the meeting every convened expert can be questioned, a changed prescription can be put to the team and re-reviewed, and a written conclusion exists only after a clinician's decision.",
+     "principle": "8 Human in the loop", "tests": ["test_meeting_interaction", "test_meeting_what_if", "test_meeting_conclusion_needs_a_decision"]},
 ]

@@ -46,13 +46,16 @@ is the Space configuration.
 
 ## What you see
 
-| Tab | What it does |
+The home page shows six 3D colour buttons. Each opens its own page, with a Home button to come back.
+
+| Button | What it opens |
 |---|---|
-| 1 · Consult the virtual team | Enter a request (or pick an example). The 3D room shows which experts were convened, their verdicts and whether each one's human counterpart can be reached now. Findings, a safety double-check and a draft follow. You then record your decision. |
-| 2 · Review a patient list | Run the team over a whole CSV list, or over 200 invented patients, and see what share is escalated and which rules fire most. |
-| 3 · What is being prescribed | Live monthly NHS prescribing counts for urine-infection antibiotics, diabetes medicines and cancer-care medicines, from OpenPrescribing.net. |
-| 4 · Engineering and assurance | The nine engineering principles, twenty-one requirements traced to tests, and ten acceptance targets you can run on the spot. |
-| 5 · About and limits | What is new compared with the paper, and what the tool cannot do. |
+| Convene the virtual MDT | Step 1: enter the prescribing request (or pick an example). Step 2: the meeting room opens. The 3D room shows which experts were convened, their verdicts and whether each one's human counterpart can be reached now. You can ask any expert a question, go round the table, put a changed prescription to the team and see who changes position, then record your decision. A written conclusion is produced and can be downloaded. |
+| Review a patient list | Run the team over a whole CSV list, or over 200 invented patients, and see what share is escalated and which rules fire most. |
+| What is being prescribed | Live monthly NHS prescribing counts for urine-infection antibiotics, diabetes medicines and cancer-care medicines, from OpenPrescribing.net. |
+| Engineering and assurance | The nine engineering principles, the requirements traced to tests, and ten acceptance targets you can run on the spot. |
+| Decision log | Every decision recorded in the session, with a check that the log has not been altered. |
+| About and limits | What is new compared with the paper, and what the tool cannot do. |
 
 ## How a request is handled
 
@@ -106,7 +109,7 @@ request ─► 1 Triage notes ─► 2 Convene team ─► 3 Experts work in par
 
 ```bash
 pip install pytest
-pytest -q                 # 82 tests
+pytest -q                 # 85 tests
 python -m vmdt.evaluate   # 10 acceptance targets; exits with an error if any fails
 ```
 
@@ -137,6 +140,8 @@ An invented example is in `data/sample_patients_synthetic.csv`. Use only anonymi
   it does not know is flagged for manual review, never passed silently.
 * The evaluation cases and the rules were written by the same team. A perfect score shows the controls work as
   designed. It does not show clinical accuracy.
+* In the meeting the experts answer a fixed set of questions from their recorded findings. They cannot answer
+  free-text questions.
 * The experts are rule-based programs. No language model decides anything. Each expert slot has a fixed
   input/output contract, so a properly evaluated model can replace one later without changing the rest.
 * The Literature expert lists recent PubMed titles only. It does not grade or summarise evidence.

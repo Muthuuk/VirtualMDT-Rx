@@ -127,3 +127,4 @@ class CaseResult:
     sequential_ms: float
     convened: List[dict]
     case_hash: str = ""
+    alternative_proposal: Optional[dict] = None   # the safer option in structured form, for "try it with the team"
