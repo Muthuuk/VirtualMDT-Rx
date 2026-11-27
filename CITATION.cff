@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "VirtualMDT-Rx: a virtual multidisciplinary team for safer prescribing by GPs and consultants (research demonstrator)"
+type: software
+version: 1.0.0
+date-released: 2026-11-27
+license: MIT
+repository-code: "https://github.com/Muthuuk/VirtualMDT-Rx"
+authors:
+  - family-names: Ramachandran
+    given-names: Muthu
+    orcid: "https://orcid.org/0000-0002-5303-3100"
+    affiliation: "Forti5 Technologies Ltd; CAIDS, University of South Africa"
+keywords:
+  - multi-agent AI
+  - prescribing
+  - clinical decision support
+  - primary care
+  - medicines safety
+  - virtual MDT
+  - agentic AI
+  - research demonstrator

@@ -1,0 +1,25 @@
+{
+  "title": "VirtualMDT-Rx: a virtual multidisciplinary team for safer prescribing by GPs and consultants (research demonstrator)",
+  "upload_type": "software",
+  "description": "<p>VirtualMDT-Rx gathers a virtual multidisciplinary team for every prescribing request. Five core expert agents (pharmacist, physiotherapy/occupational therapy, allergy safety, guidance and literature) always attend, and specialist agents (microbiology, urology, diabetes, oncology, kidney and geriatric medicine) are called in only when the case needs them. The agents run in parallel and return a checked draft prescription with reasons, including dose, infection-evidence and antibiotic-exposure checks; the clinician always makes the decision. It implements and extends the design in Rajagopal N., Jagini A. and Ramachandran M. (2026), A Multiagent AI Framework for Parallelised Prescription Decision Support in Primary Care, ABH 2026, Porto.</p><p>Research demonstrator on invented data: not a medical device, and the medicine rules are a small, paraphrased, illustrative set, not the BNF, NICE guidance or a licensed drug database.</p>",
+  "creators": [
+    {
+      "name": "Ramachandran, Muthu",
+      "affiliation": "Forti5 Technologies Ltd; CAIDS, University of South Africa",
+      "orcid": "0000-0002-5303-3100"
+    }
+  ],
+  "license": "MIT",
+  "access_right": "open",
+  "version": "1.0.0",
+  "keywords": [
+    "multi-agent AI",
+    "prescribing",
+    "clinical decision support",
+    "primary care",
+    "medicines safety",
+    "virtual MDT",
+    "agentic AI",
+    "research demonstrator"
+  ]
+}
