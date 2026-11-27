@@ -21,6 +21,8 @@ import pandas as pd
 
 from vmdt import __version__, knowledge as kb, medreview, meeting, opendata, room3d
 from vmdt.audit import AuditLog
+from vmdt.contracts import ContractError, Notary
+from vmdt.ledger import new_salt
 from vmdt.batch import review_frame, synthetic_cohort
 from vmdt.cases import PRESETS, SUITE
 from vmdt.evaluate import evaluate
@@ -73,6 +75,10 @@ button.vm-tile:active,.vm-tile button:active{transform:rotateX(0deg) translateY(
 .t4{--hi:#a98bf5;--base:#7b4fd6;--lo:#6540b6;--edge:#462a85}
 .t5{--hi:#f47aa9;--base:#d6457f;--lo:#b43568;--edge:#822148}
 .t6{--hi:#63cf78;--base:#2e9e44;--lo:#258238;--edge:#175a25}
+.t7{--hi:#5fd3f0;--base:#1596b8;--lo:#117a96;--edge:#0b5468}
+.vm-receipt{border-radius:16px;padding:16px 22px;background:linear-gradient(160deg,#e6f6fb,#dff0f7);border:2px solid #1596b8;color:#191919;margin-top:10px}
+.vm-receipt .big{font-size:1.3rem;font-weight:800}.vm-receipt .line{font-size:1.03rem;margin-top:5px;word-break:break-word}
+.vm-receipt code{background:#fff;padding:1px 6px;border-radius:6px;font-size:.92rem}
 button.vm-wide,.vm-wide button{min-height:84px !important;text-align:center !important;justify-content:center !important;margin:18px 4px 26px !important}
 button.vm-home,.vm-home button{border-radius:14px !important;border:none !important;color:#fff !important;font-weight:700 !important;
   min-width:150px !important;background:linear-gradient(150deg,#56657f,#2f3b52) !important;
@@ -219,7 +225,7 @@ def med_review_html(res) -> str:
             "product information. 'No clash found' means none in this list.</p>")
 
 
-PAGES = ["home", "request", "meeting", "list", "data", "assurance", "log", "about"]
+PAGES = ["home", "request", "meeting", "list", "data", "assurance", "log", "ledger", "about"]
 # Runs in the browser before a page change. It must hand the inputs back unchanged.
 SCROLL_TOP = "(...args) => { window.scrollTo({top: 0, behavior: 'smooth'}); return args; }"
 
@@ -331,7 +337,7 @@ def _meeting_outputs(res, when, transcript):
             keypoints_html(res), patient_html(res))
 
 
-def convene_click(time_mode, custom_time, live, delay, *fields):
+def convene_click(notary, consent, time_mode, custom_time, live, delay, *fields):
     try:
         p = build_patient(*fields)
     except (TypeError, ValueError) as exc:
@@ -344,9 +350,23 @@ def convene_click(time_mode, custom_time, live, delay, *fields):
             when = datetime.strptime((custom_time or "").strip(), "%Y-%m-%d %H:%M")
         except ValueError:
             raise gr.Error("Write the time like this: 2026-11-28 02:30")
+    notary = notary or {"n": Notary(), "salt": new_salt(), "last": None}
+    if not consent:
+        raise gr.Error("The consent smart contract refused the request: tick the box in step 3 to record that the patient has agreed to a virtual MDT review.")
     res = run_case(p, when=when, live_evidence=bool(live), demo_delay=bool(delay))
-    transcript = say([], meeting.CHAIR, meeting.chair_opening(res))
-    return _meeting_outputs(res, when, transcript) + tuple(nav("meeting"))
+    note = _to_ledger(notary, res)
+    transcript = say([], meeting.CHAIR, meeting.chair_opening(res) + note)
+    return _meeting_outputs(res, when, transcript) + (notary,) + tuple(nav("meeting"))
+
+
+def _to_ledger(notary, res) -> str:
+    """Write consent, each expert's access and the review outcome to the ledger (fingerprints only)."""
+    try:
+        notary["n"].record_review(res, notary["salt"])
+        b = notary["n"].ledger.blocks[-1]
+        return f" Recorded on the ledger in block {b['index']}: consent, {len(res.convened)} access records and the review outcome, as fingerprints only."
+    except ContractError as exc:
+        return f" Ledger note: {exc}"
 
 
 def _expert(res, name):
@@ -389,22 +409,23 @@ def round_click(res, transcript):
     return transcript, transcript_html(transcript)
 
 
-def whatif_click(res, when, transcript, drug, dose, freq, days):
+def whatif_click(notary, res, when, transcript, drug, dose, freq, days):
     if res is None:
         raise gr.Error("Convene the virtual team first.")
     if not (drug or "").strip():
         raise gr.Error("Enter the medicine to try.")
     transcript = say(transcript, YOU, f"What if I prescribe {drug} {dose}, {freq}" + (f", for {int(days)} days" if days else "") + "?", you=True)
     new, text = meeting.what_if(res, drug, dose, freq, days, when=when)
-    transcript = say(transcript, meeting.CHAIR, text)
-    return _meeting_outputs(new, when, transcript)
+    notary = notary or {"n": Notary(), "salt": new_salt(), "last": None}
+    transcript = say(transcript, meeting.CHAIR, text + _to_ledger(notary, new))
+    return _meeting_outputs(new, when, transcript) + (notary,)
 
 
-def safer_click(res, when, transcript):
+def safer_click(notary, res, when, transcript):
     if res is None or not res.alternative_proposal:
         raise gr.Error("No safer option is on the table for this request.")
     alt = res.alternative_proposal
-    return whatif_click(res, when, transcript, alt["drug"], alt["dose"], alt["frequency"], alt["duration_days"])
+    return whatif_click(notary, res, when, transcript, alt["drug"], alt["dose"], alt["frequency"], alt["duration_days"])
 
 
 def conclusion_html(c: dict) -> str:
@@ -427,7 +448,7 @@ def conclusion_html(c: dict) -> str:
             f"<div class='line' style='font-size:.9rem'>Decision log record {escape(c['log_record'])} · case {escape(c['case'])}</div></div>")
 
 
-def sign_click(res, log, transcript, clinician, role, decision_label, ack, changes, reason, advice):
+def sign_click(notary, res, log, transcript, clinician, role, decision_label, ack, changes, reason, advice):
     if res is None:
         raise gr.Error("Convene the virtual team first.")
     log = log or AuditLog()
@@ -435,14 +456,80 @@ def sign_click(res, log, transcript, clinician, role, decision_label, ack, chang
     ok, msg, rec = sign_off(res, key, clinician, role, log, reason=reason, changes=changes, acknowledged=bool(ack), human_advice=advice)
     if not ok:
         box = f"<div class='vm-banner' style='--c:#dc3c3d;--bg:#fdecec'><div class='line'>{escape(msg)}</div></div>"
-        return log, transcript, transcript_html(transcript), box, None, audit_table(log), audit_file(log), log_status(log)
+        return log, transcript, transcript_html(transcript), box, None, audit_table(log), audit_file(log), log_status(log), notary
     c = meeting.conclusion(res, rec, role)
+    receipt_html = ""
+    if notary:
+        try:
+            r = notary["n"].record_decision(res, rec, notary["salt"], role, clinician, bool(ack))
+            notary["last"] = {"rx": rec.get("final_prescription") or "", "code": notary["salt"], "receipt": r}
+            receipt_html = receipt_card(notary, r, rec)
+        except ContractError as exc:
+            receipt_html = f"<div class='vm-warn'>The smart contract did not record this decision: {escape(str(exc))}</div>"
     transcript = say(transcript, YOU, f"My decision: {decision_label}.", you=True)
     transcript = say(transcript, meeting.CHAIR, f"Recorded. Final prescription: {c['final_prescription']}. The meeting is closed.")
     path = os.path.join(tempfile.mkdtemp(), "vmdt_meeting_conclusion.txt")
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(meeting.conclusion_text(c))
-    return log, transcript, transcript_html(transcript), conclusion_html(c), path, audit_table(log), audit_file(log), log_status(log)
+    return log, transcript, transcript_html(transcript), conclusion_html(c) + receipt_html, path, audit_table(log), audit_file(log), log_status(log), notary
+
+
+def receipt_card(notary, r, rec) -> str:
+    ok = notary["n"].ledger.verify_receipt(r)
+    rx = rec.get("final_prescription")
+    check = (f"<div class='line'><b>For the pharmacy:</b> prescription text <code>{escape(rx)}</code> with verification code "
+             f"<code>{escape(notary['salt'])}</code> can be checked on the Blockchain ledger page.</div>") if rx else ""
+    return ("<div class='vm-receipt'><div class='big'>⛓ Blockchain receipt</div>"
+            f"<div class='line'><b>Block</b> {r['block']} · <b>record fingerprint</b> <code>{r['tx_hash'][:24]}…</code></div>"
+            f"<div class='line'><b>Signed by</b> {escape(', '.join(r['signed_by']))} · <b>proof</b> {len(r['proof'])} step(s) · "
+            f"<b>checked</b> {'✓ valid' if ok else '✕ INVALID'}</div>{check}"
+            "<div class='line' style='font-size:.9rem'>Only fingerprints are on the chain: no patient, clinician or medicine details.</div></div>")
+
+
+def ledger_view(notary):
+    """Tables for the Blockchain ledger page."""
+    if not notary or not notary["n"].ledger.blocks:
+        return "No blocks yet. Convene a virtual MDT and the first block is written.", pd.DataFrame(), pd.DataFrame()
+    L = notary["n"].ledger
+    blocks = pd.DataFrame([{"Block": b["index"], "Time (UTC)": b["time_utc"], "Proposed by": b["proposer"],
+                            "Signed by": ", ".join(sorted(b["signatures"])), "Records": b["tx_count"],
+                            "Block fingerprint": b["hash"][:16] + "…", "Previous block": b["prev_hash"][:16] + "…"} for b in L.blocks])
+    short = lambda v: (v[:12] + "…") if isinstance(v, str) and len(v) == 64 else v
+    ev = pd.DataFrame([{"Block": e["block"], "Record type": e["type"], "Patient": short(e.get("patient", "")),
+                        "Case": short(e.get("case", "")), "Detail": e.get("accessor") or e.get("outcome") or e.get("status") or e.get("purpose") or "",
+                        "Prescription": short(e.get("rx") or "")} for e in L.events()])
+    n_rec = sum(b["tx_count"] for b in L.blocks)
+    return (f"**{len(L.blocks)} block(s), {n_rec} record(s).** Chain check: {'✓ intact, every block signed by a quorum' if L.verify_chain() else '✕ BROKEN'}.",
+            blocks, ev)
+
+
+def tamper_test(notary):
+    """Change one old record on a COPY of the chain and show that the change is caught."""
+    import copy
+    if not notary or not notary["n"].ledger.blocks:
+        raise gr.Error("There is nothing on the ledger yet.")
+    forged = copy.deepcopy(notary["n"].ledger)
+    tx = forged.blocks[0]["transactions"][0]["tx"]
+    before = tx.get("type")
+    tx["type"] = "FORGED"
+    return (f"<div class='vm-banner' style='--c:#dc3c3d;--bg:#fdecec'><div class='line'><b>Tamper test on a copy:</b> the first record in block 0 was "
+            f"changed from {escape(str(before))} to FORGED. Chain check on the copy: <b>{'still passes (problem!)' if forged.verify_chain() else '✕ fails, so the change is detected'}</b>. "
+            f"The real ledger is untouched: {'✓ intact' if notary['n'].ledger.verify_chain() else '✕ broken'}.</div></div>")
+
+
+def pharmacy_check(notary, rx_text, code):
+    if not notary:
+        raise gr.Error("There is nothing on the ledger yet.")
+    ok = notary["n"].rx.is_valid_prescription((rx_text or "").strip(), (code or "").strip())
+    c, bg, msg = (("#0aac23", "#eaf7ec", "✓ Genuine: exactly this prescription was signed by a prescriber and the chain is intact.") if ok else
+                  ("#dc3c3d", "#fdecec", "✕ Not found: this text and code do not match any signed prescription. It may have been altered or never signed."))
+    return f"<div class='vm-banner' style='--c:{c};--bg:{bg}'><div class='line'>{msg}</div></div>"
+
+
+def last_receipt(notary):
+    if not notary or not notary.get("last"):
+        return "", ""
+    return notary["last"]["rx"], notary["last"]["code"]
 
 
 def log_status(log) -> str:
@@ -479,7 +566,7 @@ def _style(ax):
     ax.set_axisbelow(True)
 
 
-def batch_run(file, use_synth):
+def batch_run(file, use_synth, rank=False):
     if file is not None and not use_synth:
         df = pd.read_csv(file if isinstance(file, str) else file.name)
         label = f"your file ({len(df)} rows)"
@@ -490,6 +577,20 @@ def batch_run(file, use_synth):
     if missing:
         raise gr.Error(f"The file is missing these columns: {', '.join(sorted(missing))}")
     out = review_frame(df)
+    ml_note = ""
+    if rank:
+        try:
+            from vmdt import riskmodel
+            from vmdt.batch import row_to_patient
+            m = riskmodel.train_and_evaluate()
+            out["priority"] = [round(v, 3) for v in riskmodel.score(m["model"], [row_to_patient(r) for r in df.to_dict("records")])]
+            out = out.sort_values("priority", ascending=False).reset_index(drop=True)
+            ml_note = (f"\n\n**Learned priority score.** A small machine-learning model was trained on {m['n_train']:,} invented patients and tested on "
+                       f"{m['n_test']:,} others: it placed {m['found_in_top_10pct']} of the {m['escalated_in_test']} escalated requests in the top tenth of the list "
+                       f"(AUC {m['auc']:.2f}). It only orders the list; the rules still reviewed every request. Because the patients are invented and "
+                       "labelled by the same rules, this shows the method works, not clinical accuracy.")
+        except Exception as exc:
+            ml_note = f"\n\nThe learned priority score could not be produced ({type(exc).__name__}); the list is in its original order."
     order = ["GREEN", "AMBER", "RED", "HARD_STOP"]
     names = {"GREEN": "Ready", "AMBER": "Ready with cautions", "RED": "Escalated", "HARD_STOP": "Hard stop"}
     cols = {"GREEN": "#0aac23", "AMBER": "#fbb315", "RED": "#dc3c3d", "HARD_STOP": "#7a1c1d"}
@@ -520,18 +621,21 @@ def batch_run(file, use_synth):
     esc = int(out["outcome"].isin(["RED", "HARD_STOP"]).sum())
     summary = (f"### Reviewed {label}\n\n**{esc} of {n}** requests ({esc / n:.0%}) were escalated, "
                f"**{int((out['outcome'] == 'AMBER').sum())}** carry cautions and **{int((out['outcome'] == 'GREEN').sum())}** were clear. "
-               "Every row still needs a clinician's decision.")
+               "Every row still needs a clinician's decision." + ml_note)
     path = os.path.join(tempfile.mkdtemp(), "vmdt_batch_review.csv")
     out.to_csv(path, index=False)
     show = out.rename(columns={"patient_ref": "Case", "indication": "Treating", "proposed": "Medicine", "outcome": "Outcome",
-                               "red": "Stops", "amber": "Cautions", "top_finding": "Main finding", "rule_codes": "Rule codes",
+                               "priority": "Priority score", "red": "Stops", "amber": "Cautions", "top_finding": "Main finding", "rule_codes": "Rule codes",
                                "safer_option": "Safer option"})
     return summary, fig, top, show, path
 
 
-def trends(ind_label):
+def trends(ind_label, file=None):
     ind = INDICATIONS[ind_label]
-    df, msg = opendata.condition_trends(ind)
+    if file:
+        df, msg = opendata.trends_from_csv(file if isinstance(file, str) else file.name)
+    else:
+        df, msg = opendata.nhsbsa_trends(ind)
     if df.empty:
         return f"<div class='vm-warn'>{escape(msg)}</div>", None, pd.DataFrame()
     fig, ax = plt.subplots(figsize=(11, 5.2), dpi=110)
@@ -544,7 +648,8 @@ def trends(ind_label):
     _style(ax)
     ax.set_ylim(bottom=0)
     ax.set_ylabel("Items prescribed per month (thousands)", fontsize=13, color="#666666")
-    ax.set_title(f"{opendata.CONDITION_LABEL[ind]}: items prescribed in English general practice", fontsize=16, loc="left", color="#191919")
+    ax.set_title("Items in your uploaded file" if file else f"{opendata.CONDITION_LABEL[ind]}: items prescribed in English primary care",
+                 fontsize=16, loc="left", color="#191919")
     ax.legend(frameon=False, fontsize=12, ncol=3, loc="upper left", bbox_to_anchor=(0, -0.1))
     ax.margins(x=0.12)
     fig.tight_layout()
@@ -582,7 +687,12 @@ request, runs all the experts at the same moment, and hands the prescriber a che
    when the lab test found no infection; repeated clear tests point the prescriber towards inflammation instead. Total days of
    antibiotics over 12 months are counted, with a warning for heavy exposure and long-term nitrofurantoin.
 7. **Whole-list review.** A practice list can be reviewed in one run, and live NHS open data shows what is actually being prescribed.
-8. **Built with a software engineering method.** Twenty-three requirements traced to tests, ten acceptance targets, a release gate and a
+8. **Blockchain for privacy and trust.** Consent, each expert's access, the review outcome and the decision are written to a
+   permissioned ledger as fingerprints only. Two smart contracts enforce consent and the sign-off rules independently of the app, each
+   decision gets a receipt with a short proof, and a pharmacy can confirm a prescription is genuine.
+9. **A learned priority score (optional).** On a long list, a small machine-learning model puts the requests most likely to be escalated
+   first. It only orders the list; the rules still review every request.
+10. **Built with a software engineering method.** Twenty-eight requirements traced to tests, ten acceptance targets, a release gate and a
    tamper-evident log (the same approach as UroAgent).
 
 ## Limits you must know
@@ -595,11 +705,11 @@ request, runs all the experts at the same moment, and hands the prescriber a che
 
 PRINCIPLES = pd.DataFrame([
     ["1 Goal-driven, testable requirements", f"{len(REQUIREMENTS)} requirements, each naming the tests that prove it"],
-    ["2 Safety rules outside the model", "Rules are plain data in knowledge.py; an independent double-check re-runs them"],
-    ["3 One agent, one job", "12 single-purpose experts; each sees only its own slice of the record"],
+    ["2 Safety rules outside the model", "Rules are plain data in knowledge.py; an independent double-check re-runs them; smart contracts enforce sign-off rules again"],
+    ["3 One agent, one job", "12 single-purpose experts; each sees only its own slice of the record, and each look is logged on the ledger"],
     ["4 Least-privilege tools", "Web look-ups are read-only and carry only medicine and condition names"],
     ["5 Explicit state, reproducible", "Fixed route through the orchestrator; same case gives the same fingerprint"],
-    ["6 Observability and audit", "Per-expert timing and reasons on screen; hash-chained decision log"],
+    ["6 Observability and audit", "Per-expert timing and reasons on screen; hash-chained decision log; blockchain ledger with receipts"],
     ["7 Evaluate before trusting", f"{len(SUITE)} synthetic cases, 10 acceptance targets, release gate in continuous integration"],
     ["8 Human in the loop", "Named clinician decision on every case; escalations cannot be approved"],
     ["9 Ethics and privacy by design", "No identifiers held; references stored as salted hashes; honest limits stated on screen"],
@@ -620,6 +730,7 @@ TILES = [  # (page, label, colour class)
     ("data", "📈  What is being prescribed\nLive NHS prescribing figures", "t3"),
     ("assurance", "🛠️  Engineering and assurance\nRequirements, tests and targets", "t4"),
     ("log", "🔏  Decision log\nEvery decision, tamper-evident", "t5"),
+    ("ledger", "⛓  Blockchain ledger\nSmart contracts, proofs and privacy", "t7"),
     ("about", "ℹ️  About and limits\nWhat is new, and what it cannot do", "t6"),
 ]
 
@@ -637,6 +748,7 @@ def build() -> gr.Blocks:
                 "Do not enter real patient details. The rules are a small illustrative set, not the BNF or NICE guidance. "
                 "A qualified clinician makes every prescribing decision.</div>")
         state, log_state, when_state, talk_state = gr.State(None), gr.State(None), gr.State(None), gr.State([])
+        notary_state = gr.State(None)
         homes = []
 
         def home_button():
@@ -648,7 +760,7 @@ def build() -> gr.Blocks:
         with gr.Column(visible=True, elem_classes=["vm-page"]) as pg_home:
             gr.Markdown("### Choose what you want to do")
             tiles = {}
-            for row in (TILES[:3], TILES[3:]):
+            for row in (TILES[:4], TILES[4:]):
                 with gr.Row(elem_classes=["vm-tiles"]):
                     for page, label, cls in row:
                         tiles[page] = gr.Button(label, elem_classes=["vm-tile", cls])
@@ -695,6 +807,7 @@ def build() -> gr.Blocks:
                     courses = gr.Number(label="Antibiotic courses for UTI in 6 months", value=0, precision=0)
                     resistant = gr.Textbox(label="Recent culture resistant to (separate with ;)")
                     missed = gr.Number(label="Prescriptions not collected recently", value=0, precision=0)
+                consent = gr.Checkbox(label="The patient has agreed to a virtual MDT review of their medicines (recorded on the ledger by the consent smart contract)", value=True)
                 with gr.Accordion("Time of consultation and options", open=False):
                     time_mode = gr.Radio(["Now", "Choose a time"], label="Show expert availability for", value="Now")
                     custom_time = gr.Textbox(label="Time (YYYY-MM-DD HH:MM)", value="2026-11-28 02:30")
@@ -767,29 +880,34 @@ def build() -> gr.Blocks:
                         "Column names are listed in the README. **Do not upload identifiable patient data.**")
             with gr.Row():
                 up = gr.File(label="CSV file", file_types=[".csv"], type="filepath")
-                synth = gr.Checkbox(label="Use the 200 invented patients instead", value=True)
+                with gr.Column():
+                    synth = gr.Checkbox(label="Use the 200 invented patients instead", value=True)
+                    rank = gr.Checkbox(label="Put the riskiest first, using a learned priority score (machine learning; adds about 20 seconds)", value=False)
             run_b = gr.Button("Review the list", variant="primary")
             b_sum = gr.Markdown()
             b_plot = gr.Plot(label="Outcomes by condition")
             b_top = gr.Dataframe(label="Rules raised most often", interactive=False, wrap=True)
             b_tab = gr.Dataframe(label="Every request (table view of the chart)", interactive=False, wrap=True)
             b_dl = gr.File(label="Download the results")
-            run_b.click(batch_run, [up, synth], [b_sum, b_plot, b_top, b_tab, b_dl])
+            run_b.click(batch_run, [up, synth, rank], [b_sum, b_plot, b_top, b_tab, b_dl])
 
         # ------------------------------------------------------------ DATA
         with gr.Column(visible=HIDE, elem_classes=["vm-page"]) as pg_data:
             with gr.Row():
                 home_button()
                 gr.Markdown("## What is being prescribed")
-            gr.Markdown("Monthly counts of items prescribed in English general practice, from OpenPrescribing.net "
-                        "(built on NHS Business Services Authority data). No patient-level data is involved. Needs internet access.")
+            gr.Markdown("Monthly counts of items prescribed in English primary care, read from the official **NHS Business Services Authority** "
+                        "open data portal (English Prescribing Dataset, Open Government Licence). No patient-level data is involved. "
+                        "Needs internet access and can take up to a minute. If the portal cannot be reached, upload a CSV file with columns for the "
+                        "month, the medicine and the number of items.")
             with gr.Row():
                 t_ind = gr.Dropdown([k for k in INDICATIONS if k != "Other"], label="Medicine group", value="Urine infection (UTI)")
-                t_go = gr.Button("Fetch the latest figures", variant="primary")
+                t_file = gr.File(label="Or chart your own CSV file", file_types=[".csv"], type="filepath")
+            t_go = gr.Button("Show the figures", variant="primary")
             t_msg = gr.HTML()
             t_plot = gr.Plot(label="Trend")
             t_tab = gr.Dataframe(label="Latest month compared with a year earlier (table view of the chart)", interactive=False, wrap=True)
-            t_go.click(trends, t_ind, [t_msg, t_plot, t_tab])
+            t_go.click(trends, [t_ind, t_file], [t_msg, t_plot, t_tab])
 
         # ------------------------------------------------------- ASSURANCE
         with gr.Column(visible=HIDE, elem_classes=["vm-page"]) as pg_assurance:
@@ -820,6 +938,36 @@ def build() -> gr.Blocks:
             audit_df = gr.Dataframe(label="Decisions in this session", interactive=False)
             audit_dl = gr.File(label="Download the decision log")
 
+        # ---------------------------------------------------------- LEDGER
+        with gr.Column(visible=HIDE, elem_classes=["vm-page"]) as pg_ledger:
+            with gr.Row():
+                home_button()
+                gr.Markdown("## Blockchain ledger")
+            gr.Markdown("A shared record that no single organisation can quietly change. **Only fingerprints are stored**: scrambled codes that "
+                        "prove a record existed without showing the patient, the clinician or the medicine. Two smart contracts (rules the ledger "
+                        "enforces itself) check consent and the prescribing decision. Each block is signed by two of three organisations "
+                        "(GP practice, community pharmacy, ICB audit office). This is a single-computer demonstration, not a live network.")
+            with gr.Row():
+                l_refresh = gr.Button("Show the ledger", variant="primary")
+                l_tamper = gr.Button("Tamper test (on a copy)")
+            l_msg = gr.Markdown()
+            l_tamper_out = gr.HTML()
+            l_blocks = gr.Dataframe(label="Blocks", interactive=False, wrap=True)
+            l_events = gr.Dataframe(label="Records inside the blocks (fingerprints only)", interactive=False, wrap=True)
+            gr.Markdown("### Pharmacy check\nA pharmacy holding the prescription text and its verification code can confirm that exactly this "
+                        "prescription was signed. Change one character and the check fails.")
+            with gr.Row():
+                l_rx = gr.Textbox(label="Prescription text, exactly as signed")
+                l_code = gr.Textbox(label="Verification code")
+            with gr.Row():
+                l_fill = gr.Button("Fill in the last signed prescription")
+                l_check = gr.Button("Check this prescription", variant="primary")
+            l_check_out = gr.HTML()
+            l_refresh.click(ledger_view, notary_state, [l_msg, l_blocks, l_events])
+            l_tamper.click(tamper_test, notary_state, l_tamper_out)
+            l_fill.click(last_receipt, notary_state, [l_rx, l_code])
+            l_check.click(pharmacy_check, [notary_state, l_rx, l_code], l_check_out)
+
         # ----------------------------------------------------------- ABOUT
         with gr.Column(visible=HIDE, elem_classes=["vm-page"]) as pg_about:
             with gr.Row():
@@ -828,7 +976,7 @@ def build() -> gr.Blocks:
             gr.Markdown(ABOUT)
 
         # ---------------------------------------------------------- wiring
-        pages = [pg_home, pg_request, pg_meeting, pg_list, pg_data, pg_assurance, pg_log, pg_about]
+        pages = [pg_home, pg_request, pg_meeting, pg_list, pg_data, pg_assurance, pg_log, pg_ledger, pg_about]
         for page, btn in tiles.items():
             btn.click(lambda page=page: nav(page), None, pages, js=SCROLL_TOP)
         for b in homes:
@@ -848,14 +996,15 @@ def build() -> gr.Blocks:
         view.change(set_view, view, [left_col, panel] + panels)
         meeting_out = [state, when_state, talk_state, out_banner, out_room, out_talk, out_board, out_findings, who, decision,
                        advice, ack, w_drug, w_dose, w_freq, w_days, w_safer, out_final, final_dl, out_keys, out_patient]
-        go.click(convene_click, [time_mode, custom_time, live, delay] + inputs, meeting_out + pages, js=SCROLL_TOP)
+        go.click(convene_click, [notary_state, consent, time_mode, custom_time, live, delay] + inputs, meeting_out + [notary_state] + pages, js=SCROLL_TOP)
         who.change(spotlight_click, [state, when_state, who], out_room)
         ask.click(ask_click, [state, talk_state, who, question], [talk_state, out_talk])
         around.click(round_click, [state, talk_state], [talk_state, out_talk])
-        w_go.click(whatif_click, [state, when_state, talk_state, w_drug, w_dose, w_freq, w_days], meeting_out)
-        w_safer.click(safer_click, [state, when_state, talk_state], meeting_out)
-        sign.click(sign_click, [state, log_state, talk_state, clinician, role, decision, ack, changes, reason, advice],
-                   [log_state, talk_state, out_talk, out_final, final_dl, audit_df, audit_dl, log_msg])
+        w_go.click(whatif_click, [notary_state, state, when_state, talk_state, w_drug, w_dose, w_freq, w_days], meeting_out + [notary_state])
+        w_safer.click(safer_click, [notary_state, state, when_state, talk_state], meeting_out + [notary_state])
+        sign.click(sign_click, [notary_state, state, log_state, talk_state, clinician, role, decision, ack, changes, reason, advice],
+                   [log_state, talk_state, out_talk, out_final, final_dl, audit_df, audit_dl, log_msg, notary_state])
+        tiles["ledger"].click(ledger_view, notary_state, [l_msg, l_blocks, l_events])
 
         size.change(None, size, None, js=SIZE_JS)
         theme_pick.change(None, theme_pick, None, js=THEME_JS)

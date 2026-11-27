@@ -46,7 +46,7 @@ is the Space configuration.
 
 ## What you see
 
-The home page shows six 3D colour buttons. Each opens its own page, with a Home button to come back.
+The home page shows seven 3D colour buttons. Each opens its own page, with a Home button to come back.
 
 **Make it fit your screen and your eyes.** At the top of every page, *Display size* (Compact, Comfortable, Large) resizes
 everything in one click, so the browser zoom is not needed, and *Colours* switches between Light, Dark and High
@@ -56,8 +56,9 @@ contrast. Both choices are remembered on your device. Verdicts carry a shape (�
 |---|---|
 | Convene the virtual MDT | Enter the prescribing request in three short steps (patient, medicine, tests and history), or pick an example. The meeting room then opens, sized to fit the screen: the 3D room on the left and one panel at a time on the right (Talk, Team board, Try a change, Details, Patient summary, Decide). The expert you speak to is lit up. *Quick view* hides the room and goes straight to the key points and the decision. The 3D room shows which experts were convened, their verdicts and whether each one's human counterpart can be reached now. You can ask any expert a question, go round the table, put a changed prescription to the team and see who changes position, then record your decision. A written conclusion is produced and can be downloaded. |
 | Review a patient list | Run the team over a whole CSV list, or over 200 invented patients, and see what share is escalated and which rules fire most. |
-| What is being prescribed | Live monthly NHS prescribing counts for urine-infection antibiotics, diabetes medicines and cancer-care medicines, from OpenPrescribing.net. |
+| What is being prescribed | Monthly NHS prescribing counts for urine-infection antibiotics, diabetes medicines and cancer-care medicines, read from the NHS Business Services Authority open data portal (English Prescribing Dataset), or from a CSV file you upload. |
 | Engineering and assurance | The nine engineering principles, the requirements traced to tests, and ten acceptance targets you can run on the spot. |
+| Blockchain ledger | The permissioned ledger behind the tool: blocks, the fingerprint-only records inside them, a chain check, a tamper test on a copy, and a pharmacy check that confirms a signed prescription is genuine. |
 | Decision log | Every decision recorded in the session, with a check that the log has not been altered. |
 | About and limits | What is new compared with the paper, and what the tool cannot do. |
 
@@ -88,6 +89,23 @@ request ─► 1 Triage notes ─► 2 Convene team ─► 3 Experts work in par
   approved: the clinician takes the safer option, declines, or overrides with a written reason. Every decision goes
   into a tamper-evident log that holds no identifiers.
 
+## Blockchain and machine learning
+
+* **Ledger (`vmdt/ledger.py`).** A small permissioned blockchain. Only salted fingerprints (hash commitments) are written, so
+  no patient, clinician or medicine detail is on the chain. Each block carries a Merkle root and is valid only when signed by
+  two of three validator organisations (proof of authority). Any decision can be proved present with a short Merkle proof
+  that reveals no other record.
+* **Smart contracts (`vmdt/contracts.py`, `contracts/PrescriptionRegistry.sol`).** A consent contract (who may look, for what
+  purpose, with every expert's access logged) and a prescription contract (requested, reviewed, then signed, rejected or
+  overridden). The contract refuses, independently of the app: a review without consent, approval of an escalated case, a
+  second decision, a non-prescriber, and a decision after consent is withdrawn. The Solidity file states the same rules for
+  a real deployment; it compiles with solc 0.8.26 but has not been deployed or audited.
+* **Learned priority score (`vmdt/riskmodel.py`, optional).** Gradient-boosted trees rank a long list so the requests most
+  likely to be escalated are seen first. It only orders the list. On invented patients labelled by the same rules it reached
+  an AUC of about 0.97, which shows the method works, not clinical accuracy.
+
+This is a single-computer simulation of a ledger: there is no peer-to-peer network and the validator keys are demo keys.
+
 ## What is new compared with the paper
 
 1. The team changes with the case, instead of five fixed agents, and a side-effect expert checks the new medicine against every existing medicine.
@@ -113,7 +131,7 @@ request ─► 1 Triage notes ─► 2 Convene team ─► 3 Experts work in par
 
 ```bash
 pip install pytest
-pytest -q                 # 86 tests
+pytest -q                 # 90 tests
 python -m vmdt.evaluate   # 10 acceptance targets; exits with an error if any fails
 ```
 
@@ -150,7 +168,8 @@ An invented example is in `data/sample_patients_synthetic.csv`. Use only anonymi
   input/output contract, so a properly evaluated model can replace one later without changing the rest.
 * The Literature expert lists recent PubMed titles only. It does not grade or summarise evidence.
 * The 3D figures are drawings of software experts, not people. The rota hours are a demonstration.
-* The live NHS data tab needs internet access and depends on the OpenPrescribing service being available.
+* The NHS data page needs internet access and depends on the NHS Business Services Authority portal; it could not be tested
+  from the build environment. If it cannot be reached, nothing is drawn and a CSV file can be uploaded instead.
 
 ## Route to clinical use
 
@@ -163,5 +182,5 @@ decisions; and regulatory assessment as software as a medical device.
 
 Concept and paper: Naveen Rajagopal, Abhijay Jagini and Muthu Ramachandran. Software: Prof Muthu Ramachandran,
 Forti5 Technologies Ltd, Leeds, and CAIDS, University of South Africa. MIT licence.
-Open data: OpenPrescribing.net (Bennett Institute for Applied Data Science, University of Oxford); PubMed (US
+Open data: English Prescribing Dataset, NHS Business Services Authority (Open Government Licence v3.0); PubMed (US
 National Library of Medicine).

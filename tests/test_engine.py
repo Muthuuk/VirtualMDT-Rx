@@ -346,4 +346,105 @@ def test_open_data_parsing(monkeypatch):
     monkeypatch.setattr(opendata.requests, "get", fake_get)
     df, msg = opendata.condition_trends("uti")
     assert df["medicine"].nunique() == 5 and "OpenPrescribing" in msg
-    assert opendata.summarise(df)["Change over 12 months (%)"].iloc[0] == 20.0
+    assert opendata.summarise(df)["Change (%)"].iloc[0] == 20.0
+
+
+def test_nhsbsa_source_and_upload(monkeypatch, tmp_path):
+    """The official NHS source, exercised with canned replies (no internet needed), and the upload fallback."""
+    cols = opendata.pick_columns(["YEAR_MONTH", "CHEMICAL_SUBSTANCE_BNF_DESCR", "BNF_CODE", "ITEMS", "NIC", "ACTUAL_COST"])
+    assert cols == {"chem": "CHEMICAL_SUBSTANCE_BNF_DESCR", "items": "ITEMS", "cost": "ACTUAL_COST"}
+    with pytest.raises(ValueError):
+        opendata.pick_columns(["A", "B"])
+
+    class Resp:
+        def __init__(self, data): self.data = data
+        def raise_for_status(self): pass
+        def json(self): return self.data
+
+    def fake_get(url, params=None, **kw):
+        if url.endswith("package_show"):
+            return Resp({"result": {"resources": [{"name": "EPD_SNOMED_202608"}, {"name": "EPD_SNOMED_202609"}, {"name": "notes"}]}})
+        if "LIMIT 1" in params["sql"]:
+            return Resp({"result": {"records": [{"YEAR_MONTH": 202609, "CHEMICAL_SUBSTANCE_BNF_DESCR": "x", "ITEMS": 1, "ACTUAL_COST": 1.0}]}})
+        n = 110 if params["resource_id"].endswith("09") else 100
+        return Resp({"result": {"records": [{"MEDICINE": "Nitrofurantoin", "ITEMS": n, "ACTUAL_COST": 5.0},
+                                            {"MEDICINE": "Trimethoprim", "ITEMS": 50, "ACTUAL_COST": 2.0}]}})
+    monkeypatch.setattr(opendata.requests, "get", fake_get)
+    df, msg = opendata.nhsbsa_trends("uti")
+    assert "NHS Business Services Authority" in msg and df["date"].nunique() == 2
+    s = opendata.summarise(df)
+    assert s.iloc[0]["medicine"] == "Nitrofurantoin" and s["Change (%)"].iloc[0] == 10.0
+
+    def down(url, **kw):
+        raise ConnectionError("blocked")
+    monkeypatch.setattr(opendata.requests, "get", down)
+    df2, msg2 = opendata.nhsbsa_trends("uti")
+    assert df2.empty and "nothing is made up" in msg2            # failure is reported, never papered over
+
+    f = tmp_path / "mine.csv"
+    f.write_text("YEAR_MONTH,Chemical name,Items\n202608,Nitrofurantoin,10\n202609,Nitrofurantoin,12\n202609,Nitrofurantoin,3\n")
+    up, m3 = opendata.trends_from_csv(str(f))
+    assert len(up) == 2 and up["items"].iloc[-1] == 15 and "uploaded file" in m3
+
+
+def test_ledger_and_merkle_proofs():
+    from vmdt import ledger as lg
+    leaves = [lg.sha(str(i)) for i in range(5)]
+    root = lg.merkle_root(leaves)
+    for i, leaf in enumerate(leaves):
+        assert lg.verify_merkle(leaf, lg.merkle_proof(leaves, i), root)
+    assert not lg.verify_merkle(lg.sha("forged"), lg.merkle_proof(leaves, 2), root)
+    L = lg.Ledger()
+    a = L.submit({"type": "X", "v": 1}); b = L.submit({"type": "X", "v": 2}); L.seal()
+    c = L.submit({"type": "X", "v": 3}); L.seal()
+    assert L.verify_chain() and len(L.blocks) == 2 and all(len(blk["signatures"]) >= 2 for blk in L.blocks)
+    receipt = L.prove(b)
+    assert L.verify_receipt(receipt) and len(receipt["proof"]) == 1    # one sibling proves b without showing a
+    L.blocks[0]["transactions"][0]["tx"]["v"] = 99                     # tamper with history
+    assert not L.verify_chain() and not L.verify_receipt(receipt)
+    L2 = lg.Ledger(); L2.submit({"type": "X"}); L2.seal(signers=["GP practice"])   # one signature is below the quorum
+    assert not L2.verify_chain()
+    assert lg.commit("Jane", "s1") != lg.commit("Jane", "s2") and lg.commit("Jane", "s1") == lg.commit("Jane", "s1")
+
+
+def test_smart_contracts_enforce_the_rules():
+    from vmdt.contracts import ContractError, Notary
+    from vmdt.ledger import new_salt
+    n, salt = Notary(), new_salt()
+    red = run_case(case("UTI-02"))
+    with pytest.raises(ContractError):                                 # no consent, no review
+        n.record_review(red, salt, consent_given=False)
+    n.record_review(red, salt)
+    kinds = [e["type"] for e in n.ledger.events()]
+    assert kinds.count("ACCESS") == len(red.convened) and "RX_REVIEWED" in kinds
+    with pytest.raises(ContractError):                                 # the chain itself refuses to approve an escalated case
+        n.rx.decide(__import__("vmdt.ledger", fromlist=["commit"]).commit(red.case_hash, salt), "APPROVE", "GP", "c", "rx")
+    log = AuditLog()
+    ok, _, rec = sign_off(red, "ACCEPT_ALTERNATIVE", "GP7", "GP", log)
+    receipt = n.record_decision(red, rec, salt, "GP", "GP7", acknowledged=False)
+    assert n.ledger.verify_receipt(receipt) and n.ledger.verify_chain()
+    assert n.rx.is_valid_prescription(rec["final_prescription"], salt)          # a pharmacy can confirm it
+    assert not n.rx.is_valid_prescription(rec["final_prescription"] + " x2", salt)   # an altered prescription fails
+    with pytest.raises(ContractError):                                 # a case is decided once only
+        n.record_decision(red, rec, salt, "GP", "GP7", acknowledged=False)
+    blob = str(n.ledger.blocks)
+    assert "UTI-02" not in blob and "GP7" not in blob and "rimethoprim" not in blob and "nitrofurantoin" not in blob.lower()
+    amber = run_case(case("UTI-04")); n.record_review(amber, salt)
+    ok, _, rec2 = sign_off(amber, "APPROVE", "GP7", "GP", log, acknowledged=True)
+    with pytest.raises(ContractError):
+        n.record_decision(amber, rec2, salt, "Receptionist", "X1", acknowledged=True)   # not a prescriber role
+    n.consent.revoke(__import__("vmdt.ledger", fromlist=["commit"]).commit(amber.patient.ref, salt))
+    with pytest.raises(ContractError):
+        n.record_decision(amber, rec2, salt, "GP", "GP7", acknowledged=True)            # consent withdrawn
+
+
+def test_priority_model_is_optional_and_never_decides():
+    sklearn = pytest.importorskip("sklearn")
+    from vmdt import riskmodel
+    from vmdt.batch import row_to_patient
+    r = riskmodel.train_and_evaluate(n_train=600, n_test=400, seed=3)
+    assert 0.5 < r["auc"] <= 1.0 and r["n_test"] == 400
+    pts = [row_to_patient(x) for x in synthetic_cohort(20, seed=5).to_dict("records")]
+    s = riskmodel.score(r["model"], pts)
+    assert len(s) == 20 and all(0 <= v <= 1 for v in s)
+    assert len(riskmodel.features(pts[0])) == len(riskmodel.FEATURES)

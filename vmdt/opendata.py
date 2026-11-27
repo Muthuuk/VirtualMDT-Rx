@@ -83,21 +83,124 @@ def condition_trends(indication: str) -> Tuple[pd.DataFrame, str]:
     return pd.concat(frames, ignore_index=True), msg
 
 
+# ----------------------------------------------------------------------------
+# NHS Business Services Authority (NHSBSA) Open Data Portal: the official source.
+# OpenPrescribing stopped serving automated third-party requests in 2026 (they are
+# turned away by its web filter), so the tool now reads the English Prescribing
+# Dataset directly from NHSBSA, published under the Open Government Licence.
+# ----------------------------------------------------------------------------
+NHSBSA = "https://opendata.nhsbsa.net/api/3/action"
+EPD_PACKAGE = "english-prescribing-dataset-epd-with-snomed-code"
+EPD_NAMES = {  # how each medicine starts in the dataset's chemical-substance description
+    "uti": ["Nitrofurantoin", "Trimethoprim", "Pivmecillinam", "Fosfomycin", "Cefalexin"],
+    "type2_diabetes": ["Metformin", "Gliclazide", "Dapagliflozin", "Empagliflozin", "Sitagliptin", "Linagliptin"],
+    "cancer_care": ["Tamoxifen", "Letrozole", "Anastrozole", "Methotrexate", "Morphine"],
+}
+
+
+def epd_resources(timeout: float = 20) -> list:
+    """Monthly tables of the dataset, newest first: [(name such as EPD_SNOMED_202609, yyyymm)]."""
+    import re
+    r = requests.get(f"{NHSBSA}/package_show", params={"id": EPD_PACKAGE}, headers=UA, timeout=timeout)
+    r.raise_for_status()
+    out = []
+    for res in r.json()["result"]["resources"]:
+        m = re.search(r"(\d{6})$", str(res.get("name", "")))
+        if m:
+            out.append((res["name"], m.group(1)))
+    return sorted(set(out), key=lambda t: t[1], reverse=True)
+
+
+def pick_columns(columns: list) -> dict:
+    """Find the three columns we need, whatever exact names this month's table uses."""
+    up = {c.upper(): c for c in columns}
+    chem = next((up[c] for c in up if "CHEMICAL" in c and "DESC" in c), None) or next((up[c] for c in up if "CHEMICAL" in c and "CODE" not in c), None)
+    items = up.get("ITEMS") or next((up[c] for c in up if c.endswith("ITEMS")), None)
+    cost = up.get("ACTUAL_COST") or next((up[c] for c in up if "COST" in c), None)
+    if not (chem and items):
+        raise ValueError(f"Could not find the medicine and items columns in: {columns[:12]}")
+    return {"chem": chem, "items": items, "cost": cost}
+
+
+def _sql(resource: str, sql: str, timeout: float = 60) -> list:
+    r = requests.get(f"{NHSBSA}/datastore_search_sql", params={"resource_id": resource, "sql": sql}, headers=UA, timeout=timeout)
+    r.raise_for_status()
+    result = r.json().get("result", {})
+    if "records" in result:
+        return result["records"]
+    inner = result.get("result", {})          # large answers are returned as a file to download
+    if isinstance(inner, dict) and inner.get("records"):
+        return inner["records"]
+    urls = result.get("gc_urls") or (inner.get("gc_urls") if isinstance(inner, dict) else None)
+    if urls:
+        import io
+        return pd.read_csv(io.StringIO(requests.get(urls[0]["url"], headers=UA, timeout=timeout).text)).to_dict("records")
+    return []
+
+
+def nhsbsa_trends(indication: str, months: int = 6) -> Tuple[pd.DataFrame, str]:
+    """National monthly items for each medicine in a group, from the official NHS dataset."""
+    names = EPD_NAMES.get(indication, [])
+    try:
+        resources = epd_resources()[:months]
+        if not resources:
+            return pd.DataFrame(), "The NHS open data portal listed no monthly tables."
+        cols = pick_columns(list(_sql(resources[0][0], f"SELECT * FROM `{resources[0][0]}` LIMIT 1")[0].keys()))
+        where = " OR ".join(f"{cols['chem']} LIKE '{n}%'" for n in names)
+        cost = f", SUM({cols['cost']}) AS ACTUAL_COST" if cols["cost"] else ""
+        frames = []
+        for name, ym in resources:
+            rows = _sql(name, f"SELECT {cols['chem']} AS MEDICINE, SUM({cols['items']}) AS ITEMS{cost} FROM `{name}` WHERE {where} GROUP BY {cols['chem']}")
+            for row in rows:
+                frames.append({"date": pd.to_datetime(ym + "01", format="%Y%m%d"), "medicine": str(row["MEDICINE"]),
+                               "bnf_code": "", "items": float(row["ITEMS"]), "actual_cost": float(row.get("ACTUAL_COST") or 0)})
+    except Exception as exc:
+        return pd.DataFrame(), (f"The NHS open data portal could not be read from this computer ({type(exc).__name__}: {str(exc)[:160]}). "
+                                "No chart is shown and nothing is made up. You can upload a file instead.")
+    if not frames:
+        return pd.DataFrame(), "The NHS open data portal returned no rows for these medicines."
+    df = pd.DataFrame(frames)
+    df["medicine"] = df["medicine"].apply(lambda s: next((n for n in names if s.lower().startswith(n.lower())), s))
+    df = df.groupby(["date", "medicine", "bnf_code"], as_index=False)[["items", "actual_cost"]].sum()   # e.g. two salts of one medicine
+    return df, ("Source: NHS Business Services Authority, English Prescribing Dataset (Open Government Licence v3.0). "
+                f"England, primary care, latest {len(resources)} months.")
+
+
+def trends_from_csv(path: str) -> Tuple[pd.DataFrame, str]:
+    """Chart a file the user downloaded by hand. Needs columns for month, medicine and items (names are matched loosely)."""
+    raw = pd.read_csv(path)
+    low = {c.lower().strip(): c for c in raw.columns}
+    find = lambda *keys: next((low[c] for c in low if any(k in c for k in keys)), None)
+    date_c, med_c, items_c, cost_c = find("date", "month", "year_month"), find("medicine", "chemical", "name", "drug"), find("items"), find("cost")
+    if not (date_c and med_c and items_c):
+        return pd.DataFrame(), f"The file needs columns for the month, the medicine and the number of items. Found: {list(raw.columns)[:10]}"
+    d = raw[date_c].astype(str).str.strip()
+    dates = pd.to_datetime(d.where(~d.str.fullmatch(r"\d{6}"), d + "01"), errors="coerce", format="mixed")
+    df = pd.DataFrame({"date": dates, "medicine": raw[med_c].astype(str), "bnf_code": "",
+                       "items": pd.to_numeric(raw[items_c], errors="coerce"),
+                       "actual_cost": pd.to_numeric(raw[cost_c], errors="coerce") if cost_c else 0.0}).dropna(subset=["date", "items"])
+    df = df.groupby(["date", "medicine", "bnf_code"], as_index=False)[["items", "actual_cost"]].sum()
+    return df, f"Source: your uploaded file ({len(df)} rows after grouping)."
+
+
 def summarise(df: pd.DataFrame) -> pd.DataFrame:
-    """Latest month, the same month a year earlier, and the change."""
+    """Latest month against a year earlier (or the earliest month held), with each medicine's share."""
     if df.empty:
         return df
     latest = df["date"].max()
     prior = latest - pd.DateOffset(years=1)
-    now = df[df["date"] == latest].set_index("medicine")
-    then = df[df["date"] == prior].set_index("medicine")
-    out = pd.DataFrame({"BNF code": now["bnf_code"], f"Items, {latest:%b %Y}": now["items"].astype(int),
-                        f"Items, {prior:%b %Y}": then["items"].reindex(now.index)})
-    a, b = out.iloc[:, 1], out.iloc[:, 2]
-    out["Change over 12 months (%)"] = ((a - b) / b * 100).round(1)
+    if df[df["date"] == prior].empty:            # less than a year of data: compare with the earliest month held
+        prior = df["date"].min()
+    now = df[df["date"] == latest].groupby("medicine")[["items", "actual_cost"]].sum()
+    out = pd.DataFrame({f"Items, {latest:%b %Y}": now["items"].astype(int)})
+    a = out.iloc[:, 0]
+    if prior != latest:
+        b = df[df["date"] == prior].groupby("medicine")["items"].sum().reindex(now.index)
+        out[f"Items, {prior:%b %Y}"] = b
+        out["Change (%)"] = ((a - b) / b * 100).round(1)
     out["Share of group (%)"] = (a / a.sum() * 100).round(1)
     out[f"Cost, {latest:%b %Y} (GBP)"] = now["actual_cost"].round(0)
-    return out.sort_values(out.columns[1], ascending=False).reset_index()
+    return out.sort_values(out.columns[0], ascending=False).reset_index()
 
 
 def pubmed_recent(drug: str, indication: str = "", n: int = 3, timeout: float = 4) -> Tuple[List[tuple], str]:
