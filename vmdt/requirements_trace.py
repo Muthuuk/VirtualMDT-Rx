@@ -49,4 +49,6 @@ REQUIREMENTS = [
      "principle": "1 Testable requirements", "tests": ["test_antibiotic_exposure"]},
     {"id": "REQ-22", "goal": "Human control", "text": "In the meeting every convened expert can be questioned, a changed prescription can be put to the team and re-reviewed, and a written conclusion exists only after a clinician's decision.",
      "principle": "8 Human in the loop", "tests": ["test_meeting_interaction", "test_meeting_what_if", "test_meeting_conclusion_needs_a_decision"]},
+    {"id": "REQ-23", "goal": "Accessibility", "text": "Verdicts are shown with a shape as well as a colour; the expert being spoken to is highlighted; a plain-words patient summary never names a medicine as an option when none has passed the checks.",
+     "principle": "9 Ethics by design", "tests": ["test_patient_summary_and_key_points"]},
 ]

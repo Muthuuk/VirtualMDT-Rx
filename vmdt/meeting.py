@@ -167,3 +167,35 @@ def conclusion_text(c: dict) -> str:
         lines += ["Human advice requested from: " + "; ".join(c["human_advice"]), ""]
     lines += [f"Decision log record: {c['log_record']}   Case fingerprint: {c['case']}"]
     return "\n".join(lines)
+
+
+def key_points(result: CaseResult, limit: int = 5) -> List[tuple]:
+    """The few things to read before deciding: the worst findings first."""
+    return [(f.level, f.title) for f in result.findings if f.level != INFO][:limit]
+
+
+def patient_summary(result: CaseResult) -> dict:
+    """A plain-words draft for the prescriber to read out or adapt. It carries no clinical
+    reasoning and never tells the patient to take anything: nothing is prescribed until the
+    prescriber decides."""
+    prop = result.patient.to_dict()["proposal"]
+    requested = _format_rx(prop)
+    escalated = result.outcome in (RED, "HARD_STOP")
+    if not escalated:
+        considering, drug = requested, kb.normalise(prop["drug"])
+        opening = f"The medicine being considered for you is {requested}."
+    elif result.alternative:
+        considering, drug = result.alternative, kb.normalise(result.alternative_proposal["drug"])
+        opening = (f"The medicine first suggested ({prop['drug']}) does not look suitable for you. "
+                   f"Another option being considered is {result.alternative}.")
+    else:
+        considering, drug = "", ""
+        opening = (f"The medicine first suggested ({prop['drug']}) does not look suitable for you. "
+                   "Your prescriber is looking into what would be best instead.")
+    n = len([f for f in result.findings if f.level != INFO])
+    return {
+        "opening": opening, "considering": considering,
+        "look_out_for": medreview.effect_list(drug) if drug else [],
+        "being_checked": n,
+        "closing": "Nothing is prescribed until your prescriber has decided. Please ask them or your pharmacist about anything that worries you.",
+    }

@@ -309,6 +309,23 @@ def test_meeting_conclusion_needs_a_decision():
     assert "FINAL CONCLUSION" in text and "GP7" not in text and rec["hash"][:16] in text
 
 
+def test_patient_summary_and_key_points():
+    from vmdt import meeting, room3d
+    red = run_case(case("UTI-02"))
+    s = meeting.patient_summary(red)
+    assert "does not look suitable" in s["opening"] and "Trimethoprim" in s["opening"]
+    assert "rash" in s["look_out_for"]                           # side effects of the option now on the table
+    assert "Nothing is prescribed until" in s["closing"]
+    blocked = meeting.patient_summary(run_case(case("INF-01")))   # no infection found: no medicine is named as an option
+    assert blocked["considering"] == "" and blocked["look_out_for"] == []
+    ok = meeting.patient_summary(run_case(case("UTI-01")))
+    assert ok["opening"].startswith("The medicine being considered for you is Nitrofurantoin")
+    assert meeting.key_points(red)[0][0] == "RED" and len(meeting.key_points(red, limit=2)) <= 2
+    html = room3d.render(red, spotlight="pharmacist")
+    assert "✕ Stop" in html and "✓ No concern" in html           # shape as well as colour
+    assert html.count('class="vx red on"') == 1 and 'vmdt-row spot' in html
+
+
 def test_open_data_parsing(monkeypatch):
     """The live NHS data path, exercised with a canned reply (no internet needed)."""
     rows = [{"type": "chemical", "id": "0501130R0", "name": "Nitrofurantoin"},

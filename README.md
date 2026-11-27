@@ -48,9 +48,13 @@ is the Space configuration.
 
 The home page shows six 3D colour buttons. Each opens its own page, with a Home button to come back.
 
+**Make it fit your screen and your eyes.** At the top of every page, *Display size* (Compact, Comfortable, Large) resizes
+everything in one click, so the browser zoom is not needed, and *Colours* switches between Light, Dark and High
+contrast. Both choices are remembered on your device. Verdicts carry a shape (✓ ▲ ✕) as well as a colour.
+
 | Button | What it opens |
 |---|---|
-| Convene the virtual MDT | Step 1: enter the prescribing request (or pick an example). Step 2: the meeting room opens. The 3D room shows which experts were convened, their verdicts and whether each one's human counterpart can be reached now. You can ask any expert a question, go round the table, put a changed prescription to the team and see who changes position, then record your decision. A written conclusion is produced and can be downloaded. |
+| Convene the virtual MDT | Enter the prescribing request in three short steps (patient, medicine, tests and history), or pick an example. The meeting room then opens, sized to fit the screen: the 3D room on the left and one panel at a time on the right (Talk, Team board, Try a change, Details, Patient summary, Decide). The expert you speak to is lit up. *Quick view* hides the room and goes straight to the key points and the decision. The 3D room shows which experts were convened, their verdicts and whether each one's human counterpart can be reached now. You can ask any expert a question, go round the table, put a changed prescription to the team and see who changes position, then record your decision. A written conclusion is produced and can be downloaded. |
 | Review a patient list | Run the team over a whole CSV list, or over 200 invented patients, and see what share is escalated and which rules fire most. |
 | What is being prescribed | Live monthly NHS prescribing counts for urine-infection antibiotics, diabetes medicines and cancer-care medicines, from OpenPrescribing.net. |
 | Engineering and assurance | The nine engineering principles, the requirements traced to tests, and ten acceptance targets you can run on the spot. |
@@ -109,7 +113,7 @@ request ─► 1 Triage notes ─► 2 Convene team ─► 3 Experts work in par
 
 ```bash
 pip install pytest
-pytest -q                 # 85 tests
+pytest -q                 # 86 tests
 python -m vmdt.evaluate   # 10 acceptance targets; exits with an error if any fails
 ```
 

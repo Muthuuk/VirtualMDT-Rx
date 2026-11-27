@@ -19,6 +19,7 @@ from .models import AMBER, INFO, RED, CaseResult
 
 RING = {RED: "#E5484D", AMBER: "#F5A524", INFO: "#30A46C", "OFF": "#8B95A1"}
 WORD = {RED: "Stop", AMBER: "Caution", INFO: "No concern"}
+SHAPE = {RED: "✕", AMBER: "▲", INFO: "✓"}   # a shape as well as a colour, so the verdict never depends on colour alone
 
 CSS = """
 <style>
@@ -58,6 +59,9 @@ CSS = """
 .vx .ms{font-size:.8rem;color:#93A2B5;margin-top:3px}
 .vmdt-legend{margin:16px 8px 0;font-size:.95rem;color:#C9D3DF !important}
 .vmdt-legend span{display:inline-block;margin-right:16px;color:#C9D3DF !important}
+.vmdt-row.spot .vx{opacity:.38;filter:saturate(.5);transition:opacity .3s,filter .3s}
+.vmdt-row.spot .vx.on{opacity:1;filter:none;z-index:5}
+.vmdt-row.spot .vx.on .face{border:2px solid #fff;box-shadow:0 0 34px rgba(255,255,255,.45),0 18px 30px rgba(0,0,0,.4)}
 @keyframes vbob{0%,100%{transform:translateY(0) rotateY(-8deg)}50%{transform:translateY(-7px) rotateY(8deg)}}
 @keyframes vpulse{0%,100%{box-shadow:0 0 14px var(--ring),inset 0 0 10px var(--ring)}50%{box-shadow:0 0 38px var(--ring),inset 0 0 22px var(--ring)}}
 @media (prefers-reduced-motion:reduce){.fig,.vx.red .ring{animation:none}.vx .turn{transition:none}}
@@ -70,11 +74,13 @@ def empty_room() -> str:
                   '<p class="sub">Enter a request and press "Convene the virtual team". The experts this case needs will appear here.</p></div>')
 
 
-def render(result: CaseResult, when_label: str = "") -> str:
+def render(result: CaseResult, when_label: str = "", spotlight: str = "") -> str:
     by_agent = {r.agent: r for r in result.reports}
     n = len(result.convened)
+    # the expert being spoken to stands at the front, so they are always in view
+    seats = sorted(result.convened, key=lambda c: c["agent"] != spotlight) if spotlight else result.convened
     cards: List[str] = []
-    for i, c in enumerate(result.convened):
+    for i, c in enumerate(seats):
         rep = by_agent.get(c["agent"])
         level = rep.worst if rep else INFO
         notable = [f for f in (rep.findings if rep else []) if f.level != INFO] or (rep.findings if rep else [])
@@ -87,13 +93,13 @@ def render(result: CaseResult, when_label: str = "") -> str:
         back = "".join(f"<p><b>{escape(f.title)}</b><br>{escape(f.detail)}<br><span class='src'>{escape(f.code)} · {escape(f.source)}</span></p>"
                        for f in notable[:3]) or "<p>Nothing to report for this request.</p>"
         cards.append(f"""
-<div class="vx {'red' if level == RED else ''}" tabindex="0" style="--ring:{RING[level]};--coat:{c['colour']};--dot:{dot};
-     transform:rotateY({-angle:.1f}deg) translateZ({(17 - abs(angle)) * 2.2:.0f}px)" aria-label="{escape(c['name'])}: {WORD[level]}">
+<div class="vx {'red' if level == RED else ''} {'on' if spotlight == c['agent'] else ''}" tabindex="0" style="--ring:{RING[level]};--coat:{c['colour']};--dot:{dot};
+     transform:rotateY({-angle:.1f}deg) translateZ({(17 - abs(angle)) * 2.2 + (40 if spotlight == c['agent'] else 0):.0f}px){' scale(1.08)' if spotlight == c['agent'] else ''}" aria-label="{escape(c['name'])}: {WORD[level]}">
  <div class="turn">
   <div class="face">
    <div class="fig"><div class="ring"></div><div class="body"></div><div class="head"></div><div class="badge">{escape(c['name'][0])}</div></div>
    <div class="nm">{escape(c['name'])}</div><div class="rl">{escape(c['role'])}</div>
-   <div class="verdict">{WORD[level]}</div>
+   <div class="verdict">{SHAPE[level]} {WORD[level]}</div>
    <div class="avail"><span class="dot"></span>{avail}</div>
    <div class="ms">{'core team' if c['core'] else 'called in'} · {rep.ms if rep else 0:.0f} ms</div>
   </div>
@@ -107,7 +113,7 @@ def render(result: CaseResult, when_label: str = "") -> str:
     if when_label:
         sub += f" Availability shown for {escape(when_label)}."
     return (CSS + f'<div class="vmdt-room"><div class="ttl">The virtual MDT room</div><p class="sub">{sub}</p>'
-            f'<div class="vmdt-row">{"".join(cards)}</div>'
+            f'<div class="vmdt-row {"spot" if spotlight else ""}">{"".join(cards)}</div>'
             '<div class="vmdt-legend"><span>Ring colour = verdict</span><span><i class="dot" style="display:inline-block;width:10px;height:10px;'
             f'border-radius:50%;background:{RING[INFO]}"></i> human counterpart reachable now</span>'
             '<span>Hover, tap or tab to a figure to turn the card and read its reasons</span></div></div>')
